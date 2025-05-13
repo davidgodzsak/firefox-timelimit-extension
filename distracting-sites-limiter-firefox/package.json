@@ -1,0 +1,29 @@
+{
+  "name": "distracting-sites-limiter-firefox",
+  "version": "0.1.0",
+  "description": "A Firefox extension to limit time spent on distracting websites.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint . --ext .js",
+    "format": "prettier --write \"**/*.{js,json,css,md}\""
+  },
+  "keywords": [
+    "firefox",
+    "extension",
+    "productivity",
+    "time-limiter"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "devDependencies": {
+    "eslint": "^9.26.0",
+    "globals": "^15.8.0",
+    "prettier": "^3.5.3"
+  },
+  "dependencies": {}
+}

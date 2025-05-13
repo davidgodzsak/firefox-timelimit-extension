@@ -1,0 +1,38 @@
+
+- always prefer simple solutions
+- avoid code duplication whenever possible, which means checking for other areas of the codebase that might already have similar code and funcitonality, sometimes this means generalization for reusability
+- you are careful, make only changes that are requested or you are confident are wll understood and related to the change being requested
+- When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options for the existing implementation. And if you finally do this, make sure to remove the old implementation afterwards so we don’t have duplicate logic. Notify me about such cases
+- Keep the codebase very clean and organized
+- Avoid writing scripts in files if possible, especially if the script is likely only to be run once
+- Avoid having files over 200 lines of code. Refactor at that point
+- Mocking data is only needed for tests, never mock data for dev or prod
+- Never add stubbing or fake data patterns to code that affects the dev, staging or prod environments
+- Never overwrite .env file without first asking and confirming
+- Modularize components; small, reusable, single responsibility.
+- Maintain a clear file and folder structure
+- Group imports logically (third-party, then local).
+- Always ensure responsive design
+- Avoid unnecessary re-renders
+- Separate API logic clearly from frontend if needed.
+- Encapsulate API logic into reusable, type-safe modules
+- Gracefully handle edge cases (unavailable products, shipping errors).
+- Explicitly handle errors gracefully with meaningful messaging.
+- Use strategic logging (differentiate between dev and production environments).
+- Write concise, meaningful comments only when necessary.
+- Never hard-code sensitive secrets or tokens; securely manage via .env variables.
+- Always validate and sanitize user inputs to prevent vulnerabilities (XSS, SQL injection).
+- Focus on the areas of code relevant to the task
+- Do not touch code that is unrelated to the task
+- Write thorough tests for all major functionality and edge cases
+- Avoid making major changes to the patterns and architecture of how a feature works, after it has shown to work well, unless explicitly instructed
+- Always think about what other methods and areas of code might be affected by code changes
+- Write documentation for every major feature in the `/docs` folder
+- Log decisions and major changes in the `/docs/change_log.md` file grouped by date (year-month-day)
+- Stick to best practices of each platform, or lib used
+- never commit or push without approval
+- never commit and push sensitive information
+- Clearly specify tech stack, constraints, and project patterns explicitly in each prompt.
+- Ensure modularity and incremental development; break complex requests into smaller prompts.
+- Optimize project structure for maintainability and readability.
+- Clearly differentiate logs for dev and production environments.

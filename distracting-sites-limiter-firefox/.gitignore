@@ -1,0 +1,46 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Build artifacts
+dist/
+*.zip
+*.xpi
+
+# Test coverage
+coverage/
+
+# IDE & Editor specific
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+Thumbs.db
+ehthumbs.db
+
+# Windows
+Desktop.ini
+
+# Logs
+logs
+*.log
+
+# Environment variables
+.env
+.env*.local 
