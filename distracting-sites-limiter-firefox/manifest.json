@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Firefox Distraction Limiter",
+  "version": "0.1.0",
+  "description": "Helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached.",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "background": {
+    "scripts": ["background_scripts/main.js"],
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "webNavigation"
+  ],
+  "options_ui": {
+    "page": "ui/settings/settings.html",
+    "browser_style": true,
+    "open_in_tab": true
+  },
+  "default_locale": "en"
+} 

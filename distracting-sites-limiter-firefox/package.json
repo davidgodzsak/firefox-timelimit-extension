@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "description": "A Firefox extension to limit time spent on distracting websites.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "lint": "eslint . --ext .js",
     "format": "prettier --write \"**/*.{js,json,css,md}\""
+  },
+  "jest": {
+    "setupFiles": [
+      "jest-webextension-mock"
+    ]
   },
   "keywords": [
     "firefox",
@@ -23,6 +29,9 @@
   "devDependencies": {
     "eslint": "^9.26.0",
     "globals": "^15.8.0",
+    "jest": "^29.7.0",
+    "@jest/globals": "^29.7.0",
+    "jest-webextension-mock": "^4.0.0",
     "prettier": "^3.5.3"
   },
   "dependencies": {}
