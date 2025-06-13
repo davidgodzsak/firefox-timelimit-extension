@@ -28,7 +28,9 @@
     "resources": [
       "ui/timeout/timeout.html",
       "ui/timeout/timeout.css",
-      "ui/timeout/timeout.js"
+      "ui/timeout/timeout.js",
+      "ui/common_assets/css/variables.css",
+      "ui/common_assets/css/global.css"
     ],
     "matches": ["<all_urls>"]
   }],

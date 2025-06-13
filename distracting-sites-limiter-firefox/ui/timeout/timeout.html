@@ -4,24 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Site Blocked - Time Limit Reached</title>
+    <link rel="stylesheet" href="../common_assets/css/variables.css">
+    <link rel="stylesheet" href="../common_assets/css/global.css">
     <link rel="stylesheet" href="timeout.css">
 </head>
 <body>
     <div class="container">
         <div class="timeout-card">
-            <h1>Time Limit Reached</h1>
-            <div id="blocked-info">
-                <p id="blocked-url"></p>
-                <p id="block-reason" class="reason"></p>
+            <div class="timeout-header">
+                <div class="timeout-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                </div>
+                <h1 class="timeout-title">Time Limit Reached</h1>
             </div>
+            
+            <div class="blocked-info" id="blocked-info">
+                <p class="blocked-url" id="blocked-url" aria-live="polite">
+                    <!-- Will be populated by JavaScript -->
+                </p>
+                <p class="block-reason" id="block-reason" aria-live="polite">
+                    Your daily time limit for this site has been reached.
+                </p>
+            </div>
+            
             <div class="suggestion-section">
-                <h2>Why not try something else?</h2>
-                <div id="alternative-activities">
+                <h2 class="suggestions-title">Why not try something else?</h2>
+                <div class="alternative-activities" id="alternative-activities" role="list" aria-live="polite">
                     <!-- Will be populated by JavaScript -->
                 </div>
             </div>
+            
+            <div class="reset-info">
+                <p class="reset-text">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="m12 1 0 6m0 6 0 6"/>
+                        <path d="m1 12 6 0m6 0 6 0"/>
+                    </svg>
+                    Your time limit will reset tomorrow at midnight.
+                </p>
+            </div>
         </div>
     </div>
-    <script src="timeout.js" type="module"></script>
+    <script src="timeout.js"></script>
 </body>
 </html> 
