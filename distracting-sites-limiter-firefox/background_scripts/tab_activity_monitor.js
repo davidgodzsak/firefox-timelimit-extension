@@ -90,9 +90,15 @@ async function _handleWindowFocusChanged(windowId) {
  * @param {Function} activityChangeCallback - Callback function to invoke with activity updates.
  *                                          Receives an object: { tabId, url, isFocused }.
  */
-async function initializeTabActivityMonitor(activityChangeCallback) {
+export async function initializeTabActivityMonitor(activityChangeCallback) {
   _activityChangeCallback = activityChangeCallback;
   console.log('[TabMonitor] Initializing...');
+
+  // Reset state
+  _currentTabInfo = {
+    tabId: null,
+    url: null,
+  };
 
   // Set initial focus state
   try {
@@ -115,6 +121,9 @@ async function initializeTabActivityMonitor(activityChangeCallback) {
     }
   } catch (error) {
     console.error('[TabMonitor] Error querying initial active tab:', error.message);
+    // Keep state reset on error
+    _currentTabInfo.tabId = null;
+    _currentTabInfo.url = null;
   }
 
   // Attach event listeners
@@ -138,7 +147,7 @@ async function initializeTabActivityMonitor(activityChangeCallback) {
  * Gets the last known details of the active tab.
  * @returns {{tabId: number|null, url: string|null}}
  */
-function getActiveTabDetails() {
+export function getActiveTabDetails() {
   return { ..._currentTabInfo };
 }
 
@@ -146,7 +155,7 @@ function getActiveTabDetails() {
  * Gets the last known browser window focus state.
  * @returns {boolean}
  */
-function getBrowserFocusState() {
+export function getBrowserFocusState() {
   return _isWindowFocused;
 }
 

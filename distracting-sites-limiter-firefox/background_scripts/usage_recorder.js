@@ -39,11 +39,19 @@ async function _updateUsageStatsInStorage(siteId, timeIncrementSeconds, isNewOpe
     return;
   }
   const dateString = _getCurrentDateString();
-  try {
-    // These functions are expected to be globally available from storage_manager.js
-    let dailyStats = await getUsageStats(dateString) || {};
-    let siteStats = dailyStats[siteId] || { timeSpentSeconds: 0, opens: 0 };
+  let siteStats = { timeSpentSeconds: 0, opens: 0 };
 
+  try {
+    // Try to get existing stats, but continue with defaults if it fails
+    try {
+      const dailyStats = await getUsageStats(dateString) || {};
+      siteStats = dailyStats[siteId] || siteStats;
+    } catch (error) {
+      console.error(`[UsageRecorder] Error reading usage stats for site ${siteId} on ${dateString}:`, error);
+      // Continue with default stats
+    }
+
+    // Update the stats
     siteStats.timeSpentSeconds += Math.round(timeIncrementSeconds);
     if (isNewOpen) {
       siteStats.opens += 1;
@@ -80,7 +88,7 @@ async function _recordCurrentTimeSlice() {
  * Initializes the usage recorder module.
  * Currently, this is a placeholder for any future setup, but the module is mostly reactive.
  */
-function initializeUsageRecorder() {
+export function initializeUsageRecorder() {
   console.log('[UsageRecorder] Initialized.');
   // Any future one-time setup for the recorder can go here.
 }
@@ -90,7 +98,7 @@ function initializeUsageRecorder() {
  * If already tracking a site, it will stop the previous and start the new one.
  * @param {string} siteId - The ID of the distracting site to start tracking.
  */
-async function startTrackingSiteTime(siteId) {
+export async function startTrackingSiteTime(siteId) {
   if (!siteId) {
     console.warn('[UsageRecorder] Attempted to start tracking without a siteId.');
     return;
@@ -114,7 +122,7 @@ async function startTrackingSiteTime(siteId) {
  * Stops tracking time for the currently active site.
  * Records any final accumulated time before stopping.
  */
-async function stopTrackingSiteTime() {
+export async function stopTrackingSiteTime() {
   if (_currentTrackingState.intervalId) {
     clearInterval(_currentTrackingState.intervalId);
     _currentTrackingState.intervalId = null;
@@ -139,7 +147,7 @@ async function stopTrackingSiteTime() {
  * Records an "open" event for a distracting site.
  * @param {string} siteId - The ID of the distracting site that was opened.
  */
-async function recordSiteOpen(siteId) {
+export async function recordSiteOpen(siteId) {
   if (!siteId) {
     console.warn('[UsageRecorder] Attempted to record site open without a siteId.');
     return;
