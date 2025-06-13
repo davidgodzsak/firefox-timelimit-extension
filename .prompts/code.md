@@ -12,7 +12,13 @@ First, carefully review the following inputs:
 
 <implementation_plan> read in file docs/plan.md </implementation_plan>
 
-Please read @https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/ 
+Please read https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/ 
+Also read https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions
+Also read https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Anatomy_of_a_WebExtension 
+
+Examples: 
+https://github.com/mdn/webextensions-examples/tree/main/native-messaging
+https://github.com/mdn/webextensions-examples/blob/main/content-script-register
 
 Your task is to:
 

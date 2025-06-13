@@ -24,5 +24,13 @@
     "browser_style": true,
     "open_in_tab": true
   },
+  "web_accessible_resources": [{
+    "resources": [
+      "ui/timeout/timeout.html",
+      "ui/timeout/timeout.css",
+      "ui/timeout/timeout.js"
+    ],
+    "matches": ["<all_urls>"]
+  }],
   "default_locale": "en"
 } 

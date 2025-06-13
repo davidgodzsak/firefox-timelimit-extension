@@ -72,7 +72,7 @@ I will now generate the plan in the requested markdown format.
         1.  Run `npm install --save-dev eslint prettier eslint-config-airbnb-base eslint-plugin-import eslint-plugin-mozilla` (or chosen alternatives).
         2.  Create the `.eslintrc.json` and `.prettierrc.json` files with initial configurations.
 
-  - [ ] Step 0.3: Create Initial `manifest.json`
+  - [x] Step 0.3: Create Initial `manifest.json`
 
       * **Task**: Create the `manifest.json` file with essential properties: `manifest_version` (use 3 if primary target is latest Firefox, else 2), `name`, `version` (e.g., "0.1.0"), `description`, `icons`. Include initial necessary permissions: `storage` and `alarms`.
       * **Files**:
@@ -82,7 +82,7 @@ I will now generate the plan in the requested markdown format.
 
 ## Phase 1: Storage Management (`storage_manager.js`)
 
-  - [ ] Step 1.1: Implement `storage_manager.js` - Getters for Settings and Usage
+  - [x] Step 1.1: Implement `storage_manager.js` - Getters for Settings and Usage
 
       * **Task**: Create `background_scripts/storage_manager.js`. Implement `async` functions:
           * `getDistractingSites()`: Fetches `distractingSites` from `browser.storage.local`, returns `[]` if not found.
@@ -93,7 +93,7 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/storage_manager.js`: Implementation of getter functions.
       * **Step Dependencies**: Step 0.3.
 
-  - [ ] Step 1.2: Implement `storage_manager.js` - Modifiers for Distracting Sites
+  - [x] Step 1.2: Implement `storage_manager.js` - Modifiers for Distracting Sites
 
       * **Task**: In `background_scripts/storage_manager.js`, implement `async` functions:
           * `addDistractingSite(siteObject)`: Adds site, generates unique ID (e.g., `crypto.randomUUID()`). Validates `siteObject` structure.
@@ -103,7 +103,7 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/storage_manager.js`: Add implementation for these functions.
       * **Step Dependencies**: Step 1.1.
 
-  - [ ] Step 1.3: Implement `storage_manager.js` - Modifiers for Timeout Notes
+  - [x] Step 1.3: Implement `storage_manager.js` - Modifiers for Timeout Notes
 
       * **Task**: In `background_scripts/storage_manager.js`, implement `async` functions:
           * `addTimeoutNote(noteObject)`: Adds note, generates unique ID. Validates `noteObject` structure.
@@ -113,7 +113,7 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/storage_manager.js`: Add implementation for these functions.
       * **Step Dependencies**: Step 1.1.
 
-  - [ ] Step 1.4: Implement `storage_manager.js` - Usage Stats Update Function
+  - [x] Step 1.4: Implement `storage_manager.js` - Usage Stats Update Function
 
       * **Task**: In `background_scripts/storage_manager.js`, implement `async` function:
           * `updateUsageStats(dateString, siteId, usageData)`: Updates (or creates) usage data for a specific site on a specific date. `usageData` should include `timeSpentSeconds` and `opens`.
@@ -121,7 +121,7 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/storage_manager.js`: Add implementation for this function.
       * **Step Dependencies**: Step 1.1.
 
-  - [ ] Step 1.5: Unit Tests for `storage_manager.js`
+  - [x] Step 1.5: Unit Tests for `storage_manager.js`
 
       * **Task**: Create `tests/unit/background_scripts/storage_manager.test.js`. Write unit tests for all functions in `storage_manager.js`. Use `jest-webextension-mock` (or equivalent) to mock `browser.storage.local` and `crypto.randomUUID`.
       * **Files**:
@@ -135,21 +135,21 @@ I will now generate the plan in the requested markdown format.
 
 ## Phase 2: Core Background Logic
 
-  - [ ] Step 2.1: Implement `daily_reset.js`
+  - [x] Step 2.1: Implement `daily_reset.js`
 
       * **Task**: Create `background_scripts/daily_reset.js`. Implement `initializeDailyResetAlarm()` which creates a `browser.alarms` named (e.g., "dailySiteUsageReset") to trigger daily around midnight. Add an alarm listener that, when triggered, will prepare to reset usage stats for the *new* current day (actual reset interaction with storage will be minimal, focusing on setting current day's stats to zero if this module directly modifies, or signalling `time_tracker`). For now, it can simply log that the alarm fired. The main logic of reset (clearing `timeSpentSeconds` and `opens`) is primarily handled by `time_tracker.js` starting fresh each day or by `storage_manager.js` when `updateUsageStats` is called for a new day for a site. This module mainly ensures an alarm fires.
       * **Files**:
           * `background_scripts/daily_reset.js`: Alarm setup and listener.
       * **Step Dependencies**: Step 1.4 (conceptually, for `usageStats`).
 
-  - [ ] Step 2.2: Implement `time_tracker.js` - Basic Structure and Event Listeners
+  - [x] Step 2.2: Implement `time_tracker.js` - Basic Structure and Event Listeners
 
       * **Task**: Create `background_scripts/time_tracker.js`. This module will manage active tab tracking. Add event listeners for `browser.tabs.onActivated`, `browser.tabs.onUpdated`, and `browser.tabs.onRemoved`. Add `browser.windows.onFocusChanged` to track if the browser is active. Store current active tab ID and its URL.
       * Files:
           * `background_scripts/time_tracker.js`: Initial structure, event listeners, and state variables for active tab/window.
       * **Step Dependencies**: Step 1.1 (to fetch `distractingSites`).
 
-  - [ ] Step 2.3: Implement `time_tracker.js` - URL Matching and Distracting Site Detection
+  - [x] Step 2.3: Implement `time_tracker.js` - URL Matching and Distracting Site Detection
 
       * **Task**: In `time_tracker.js`, implement a function `isDistracting(url, distractingSites)` that checks if the given URL matches any `urlPattern` in the `distractingSites` list (fetched via `storage_manager.getDistractingSites()`). Use hostname matching for simplicity initially. This function will be called when tab URL changes or tab becomes active.
       * **Files**:
@@ -157,7 +157,7 @@ I will now generate the plan in the requested markdown format.
           * `lib/utils.js` (Optional): If complex URL parsing is needed, create helper functions here (e.g., `getHostname(url)`).
       * **Step Dependencies**: Step 2.2, Step 1.1.
 
-  - [ ] Step 2.4: Implement `time_tracker.js` - Time Accumulation and `opens` Count
+  - [x] Step 2.4: Implement `time_tracker.js` - Time Accumulation and `opens` Count
 
       * **Task**: In `time_tracker.js`, manage timers. When an active tab is a distracting site:
           * Start a timer if not already started.
@@ -168,21 +168,21 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/time_tracker.js`: Implement timer logic and interaction with `storage_manager`.
       * **Step Dependencies**: Step 2.3, Step 1.4.
 
-  - [ ] Step 2.5: Unit Tests for `time_tracker.js`
+  - [x] Step 2.5: Unit Tests for `time_tracker.js`
 
       * **Task**: Create `tests/unit/background_scripts/time_tracker.test.js`. Write unit tests for URL matching, distracting site detection, and time accumulation logic (mocking timers, `storage_manager`, and browser tab/window events).
       * **Files**:
           * `tests/unit/background_scripts/time_tracker.test.js`: Test cases.
       * **Step Dependencies**: Step 2.4.
 
-  - [ ] Step 2.6: Implement `site_blocker.js` - Limit Checking
+  - [x] Step 2.6: Implement `site_blocker.js` - Limit Checking
 
       * **Task**: Create `background_scripts/site_blocker.js`. Implement a function `checkAndBlockSite(tabId, url)` which will be called by `time_tracker.js` (or listen to tab events itself). This function fetches the site's definition from `storage_manager.getDistractingSites()` and its current day's usage from `storage_manager.getUsageStats()`. It checks if `timeSpentSeconds` exceeds `dailyLimitSeconds`.
       * **Files**:
           * `background_scripts/site_blocker.js`: Limit checking logic.
       * **Step Dependencies**: Step 1.1, Step 1.4, Step 2.4 (for integration point).
 
-  - [ ] Step 2.7: Implement `site_blocker.js` - Redirection
+  - [x] Step 2.7: Implement `site_blocker.js` - Redirection
 
       * **Task**: In `site_blocker.js`, if the limit is exceeded, use `browser.tabs.update(tabId, { url: browser.runtime.getURL("ui/timeout/timeout.html") + "?blockedUrl=" + encodeURIComponent(url) + "&siteId=" + siteId })` to redirect. The `siteId` corresponds to the ID from `distractingSites`.
       * **Files**:
