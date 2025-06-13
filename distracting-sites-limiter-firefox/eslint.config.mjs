@@ -13,13 +13,44 @@ const compat = new FlatCompat({
     allConfig: js.configs.all
 });
 
-export default defineConfig([{
+export default defineConfig([
+  {
+    // Main source files
+    files: ["**/*.js"],
+    ignores: ["tests/**/*.js", "coverage/**/*.js"],
     extends: compat.extends("eslint:recommended"),
-
     languageOptions: {
         globals: {
             ...globals.browser,
             ...globals.webextensions,
+            global: "readonly", // For global references in source files  
         },
     },
-}]);
+    rules: {
+        "no-prototype-builtins": "error",
+        "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    }
+  },
+  {
+    // Test files
+    files: ["tests/**/*.js"],
+    extends: compat.extends("eslint:recommended"),
+    languageOptions: {
+        globals: {
+            ...globals.browser,
+            ...globals.webextensions,
+            ...globals.jest,
+            global: "writable", // For test files that modify global
+        },
+    },
+    rules: {
+        "no-prototype-builtins": "error",
+        "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    }
+  },
+  {
+    // Coverage files - ignore
+    files: ["coverage/**/*.js"],
+    ignores: ["coverage/**/*.js"]
+  }
+]);

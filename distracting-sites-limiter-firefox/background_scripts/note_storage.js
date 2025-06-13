@@ -74,7 +74,7 @@ export async function updateTimeoutNote(noteId, updates) {
         console.error("Invalid updates object provided to updateTimeoutNote.", updates);
         return null;
     }
-    if (updates.hasOwnProperty('text') && (typeof updates.text !== 'string' || updates.text.trim() === '')) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'text') && (typeof updates.text !== 'string' || updates.text.trim() === '')) {
         console.error("Invalid text in updates for updateTimeoutNote.", updates.text);
         return null;
     }

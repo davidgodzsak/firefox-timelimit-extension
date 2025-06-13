@@ -84,15 +84,15 @@ export async function updateDistractingSite(siteId, updates) {
   }
 
   // Validate updates
-  if (updates.hasOwnProperty('urlPattern') && (typeof updates.urlPattern !== 'string' || updates.urlPattern.trim() === '')) {
+  if (Object.prototype.hasOwnProperty.call(updates, 'urlPattern') && (typeof updates.urlPattern !== 'string' || updates.urlPattern.trim() === '')) {
     console.error("Invalid urlPattern in updates for updateDistractingSite.", updates.urlPattern);
     return null;
   }
-  if (updates.hasOwnProperty('dailyLimitSeconds') && (typeof updates.dailyLimitSeconds !== 'number' || updates.dailyLimitSeconds <= 0)) {
+  if (Object.prototype.hasOwnProperty.call(updates, 'dailyLimitSeconds') && (typeof updates.dailyLimitSeconds !== 'number' || updates.dailyLimitSeconds <= 0)) {
     console.error("Invalid dailyLimitSeconds in updates for updateDistractingSite.", updates.dailyLimitSeconds);
     return null;
   }
-  if (updates.hasOwnProperty('isEnabled') && typeof updates.isEnabled !== 'boolean') {
+  if (Object.prototype.hasOwnProperty.call(updates, 'isEnabled') && typeof updates.isEnabled !== 'boolean') {
     console.error("Invalid isEnabled in updates for updateDistractingSite.", updates.isEnabled);
     return null;
   }

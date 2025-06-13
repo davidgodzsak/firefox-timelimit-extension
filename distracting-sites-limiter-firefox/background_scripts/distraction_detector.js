@@ -24,7 +24,7 @@ function _getHostnameFromUrl(urlString) {
     }
     const url = new URL(urlString);
     return url.hostname;
-  } catch (error) {
+  } catch {
     // Log quietly as this can happen with temporary/internal URLs
     // console.warn(`[DistractionDetector] Error parsing URL '${urlString}':`, error.message);
     return null;

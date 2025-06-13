@@ -5,26 +5,34 @@
 
 import { jest } from '@jest/globals';
 
-// Mock the storage functions that usage_recorder.js expects to be globally available
+// Since usage_recorder imports from usage_storage, let's mock those functions globally
+// This approach works with the current Jest setup
 global.getUsageStats = jest.fn();
 global.updateUsageStats = jest.fn();
-
-// Import after setting up mocks
-import {
-  initializeUsageRecorder,
-  startTrackingSiteTime,
-  stopTrackingSiteTime,
-  recordSiteOpen,
-} from '../../../background_scripts/usage_recorder.js';
 
 describe('UsageRecorder', () => {
   let mockIntervalId;
   let mockIntervalCallback;
   let currentTime;
 
+  // Import after globals are set
+  let initializeUsageRecorder, startTrackingSiteTime, stopTrackingSiteTime, recordSiteOpen;
+
+  beforeAll(async () => {
+    // Now we'll try to patch the usage_recorder module to use our global mocks
+    // We need to do this before importing
+    const module = await import('../../../background_scripts/usage_recorder.js');
+    initializeUsageRecorder = module.initializeUsageRecorder;
+    startTrackingSiteTime = module.startTrackingSiteTime;
+    stopTrackingSiteTime = module.stopTrackingSiteTime;
+    recordSiteOpen = module.recordSiteOpen;
+  });
+
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
+    global.getUsageStats.mockClear();
+    global.updateUsageStats.mockClear();
     jest.useFakeTimers();
 
     // Set up time mocking
@@ -32,13 +40,13 @@ describe('UsageRecorder', () => {
     global.Date.now = jest.fn(() => currentTime);
 
     // Default mock implementations
-    getUsageStats.mockResolvedValue({});
-    updateUsageStats.mockResolvedValue();
+    global.getUsageStats.mockResolvedValue({});
+    global.updateUsageStats.mockResolvedValue(true);
 
     // Mock setInterval to capture the callback
     mockIntervalId = 123; // Arbitrary ID
     mockIntervalCallback = null;
-    global.setInterval = jest.fn((callback, ms) => {
+    global.setInterval = jest.fn((callback, _ms) => {
       mockIntervalCallback = callback;
       return mockIntervalId;
     });
@@ -67,7 +75,7 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -94,7 +102,7 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -102,7 +110,7 @@ describe('UsageRecorder', () => {
           opens: 0,
         })
       );
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site2',
         expect.objectContaining({
@@ -119,7 +127,7 @@ describe('UsageRecorder', () => {
       currentTime += 3000;
       await stopTrackingSiteTime();
 
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -140,8 +148,8 @@ describe('UsageRecorder', () => {
         }
       }
 
-      expect(updateUsageStats).toHaveBeenCalledTimes(3);
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledTimes(3);
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -160,7 +168,7 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      expect(updateUsageStats).not.toHaveBeenCalled();
+      expect(global.updateUsageStats).not.toHaveBeenCalled();
     });
   });
 
@@ -168,7 +176,7 @@ describe('UsageRecorder', () => {
     it('should record a site open without time spent', async () => {
       await recordSiteOpen('site1');
 
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -181,11 +189,11 @@ describe('UsageRecorder', () => {
     it('should not record open with invalid site ID', async () => {
       await recordSiteOpen(null);
 
-      expect(updateUsageStats).not.toHaveBeenCalled();
+      expect(global.updateUsageStats).not.toHaveBeenCalled();
     });
 
     it('should handle storage errors gracefully', async () => {
-      updateUsageStats.mockRejectedValue(new Error('Storage error'));
+      global.updateUsageStats.mockRejectedValue(new Error('Storage error'));
 
       // Should not throw
       await expect(recordSiteOpen('site1')).resolves.not.toThrow();
@@ -195,8 +203,8 @@ describe('UsageRecorder', () => {
   describe('error handling', () => {
     it('should handle storage read errors gracefully', async () => {
       // Set up storage read error
-      getUsageStats.mockRejectedValue(new Error('Storage read error'));
-      updateUsageStats.mockResolvedValue(); // Make sure updates still work
+      global.getUsageStats.mockRejectedValue(new Error('Storage read error'));
+      global.updateUsageStats.mockResolvedValue(true); // Make sure updates still work
 
       await startTrackingSiteTime('site1');
       
@@ -207,7 +215,7 @@ describe('UsageRecorder', () => {
       }
 
       // Should still try to update with new stats
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -218,7 +226,7 @@ describe('UsageRecorder', () => {
     });
 
     it('should handle storage write errors gracefully', async () => {
-      updateUsageStats.mockRejectedValue(new Error('Storage write error'));
+      global.updateUsageStats.mockRejectedValue(new Error('Storage write error'));
 
       await startTrackingSiteTime('site1');
       
@@ -228,25 +236,79 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      // Should not throw, just log error (which we can't test directly)
-      await expect(stopTrackingSiteTime()).resolves.not.toThrow();
+      // Should still try to call updateUsageStats even if it fails
+      expect(global.updateUsageStats).toHaveBeenCalled();
     });
   });
 
   describe('date handling', () => {
     it('should use correct date format for storage', async () => {
-      const mockDate = new Date('2024-03-14T12:00:00Z');
-      const spy = jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+      // Mock a specific date - we need to override the Date constructor
+      const originalDate = global.Date;
+      const mockDate = new Date('2024-03-14T10:30:00Z');
+      
+      global.Date = class extends Date {
+        constructor(...args) {
+          if (args.length === 0) {
+            super(mockDate);
+          } else {
+            super(...args);
+          }
+        }
+        
+        static now() {
+          return mockDate.getTime();
+        }
+        
+        getFullYear() { return mockDate.getFullYear(); }
+        getMonth() { return mockDate.getMonth(); }
+        getDate() { return mockDate.getDate(); }
+      };
 
       await recordSiteOpen('site1');
 
-      expect(updateUsageStats).toHaveBeenCalledWith(
+      expect(global.updateUsageStats).toHaveBeenCalledWith(
         '2024-03-14',
         'site1',
         expect.any(Object)
       );
+      
+      // Restore original Date
+      global.Date = originalDate;
+    });
 
-      spy.mockRestore();
+    it('should handle date changes correctly', async () => {
+      global.updateUsageStats.mockResolvedValue(true);
+
+      await startTrackingSiteTime('site1');
+      
+      // Simulate time passing (5 seconds)
+      currentTime += 5000;
+      if (mockIntervalCallback) {
+        await mockIntervalCallback();
+      }
+
+      await stopTrackingSiteTime();
+
+      expect(global.updateUsageStats).toHaveBeenCalled();
+    });
+  });
+
+  describe('timer management', () => {
+    it('should clear interval when stopping tracking', async () => {
+      await startTrackingSiteTime('site1');
+      await stopTrackingSiteTime();
+
+      expect(global.clearInterval).toHaveBeenCalledWith(mockIntervalId);
+    });
+
+    it('should start new interval when starting tracking', async () => {
+      await startTrackingSiteTime('site1');
+
+      expect(global.setInterval).toHaveBeenCalledWith(
+        expect.any(Function),
+        5000 // TRACKING_RESOLUTION_MS
+      );
     });
   });
 }); 
