@@ -115,7 +115,7 @@ function createActivityElement(activity) {
 /**
  * Displays alternative activities to encourage the user to do something else.
  * 
- * @param {Array} activities - Array of activity objects from timeout notes
+ * @param {Array} activities - Array containing a single activity object or empty
  */
 function displayAlternativeActivities(activities) {
     const container = document.getElementById('alternative-activities');
@@ -129,8 +129,10 @@ function displayAlternativeActivities(activities) {
     container.innerHTML = '';
     container.classList.remove('loading');
     
-    // Handle empty activities array
-    if (!activities || activities.length === 0) {
+    // Handle empty activities array or null activity
+    const validActivities = activities.filter(activity => activity && activity.text);
+    
+    if (validActivities.length === 0) {
         const emptyDiv = document.createElement('div');
         emptyDiv.className = 'activity-empty';
         emptyDiv.textContent = 'No alternative activities configured. Why not take a moment to step away from the screen?';
@@ -138,24 +140,12 @@ function displayAlternativeActivities(activities) {
         return;
     }
     
-    // Randomly select activities to display (up to the configured maximum)
-    const selectedActivities = activities
-        .filter(activity => activity && activity.text) // Filter out invalid activities
-        .sort(() => Math.random() - 0.5) // Shuffle array
-        .slice(0, CONFIG.MAX_ACTIVITIES_SHOWN);
-    
-    // Create and append activity elements
-    selectedActivities.forEach(activity => {
-        try {
-            const activityElement = createActivityElement(activity);
-            container.appendChild(activityElement);
-        } catch (error) {
-            console.error('[Timeout] Error creating activity element:', error);
-        }
-    });
-    
-    // If we have fewer activities than expected, show a message
-    if (selectedActivities.length === 0) {
+    // Display the single activity (no random selection needed since we get one random note)
+    try {
+        const activityElement = createActivityElement(validActivities[0]);
+        container.appendChild(activityElement);
+    } catch (error) {
+        console.error('[Timeout] Error creating activity element:', error);
         const emptyDiv = document.createElement('div');
         emptyDiv.className = 'activity-empty';
         emptyDiv.textContent = 'Unable to load alternative activities. Consider taking a break!';
@@ -176,26 +166,26 @@ function showLoadingState() {
 }
 
 /**
- * Requests timeout notes from the background script using message passing.
+ * Requests a random timeout note from the background script using message passing.
  * 
- * @returns {Promise<Array>} Promise that resolves to an array of timeout notes
+ * @returns {Promise<Object|null>} Promise that resolves to a single random timeout note or null
  */
-async function fetchTimeoutNotes() {
+async function fetchRandomTimeoutNote() {
     try {
-        // Send message to background script to get timeout notes
+        // Send message to background script to get a random timeout note
         const response = await browser.runtime.sendMessage({
-            action: 'getTimeoutNotes'
+            action: 'getRandomTimeoutNote'
         });
         
         if (response && response.success) {
-            return response.data || [];
+            return response.data; // This will be a single note object or null
         } else {
-            console.warn('[Timeout] Failed to fetch timeout notes:', response?.error);
-            return [];
+            console.warn('[Timeout] Failed to fetch random timeout note:', response?.error);
+            return null;
         }
     } catch (error) {
         console.error('[Timeout] Error communicating with background script:', error);
-        return [];
+        return null;
     }
 }
 
@@ -240,9 +230,9 @@ async function initializeTimeoutPage() {
         }, CONFIG.LOADING_TIMEOUT);
         
         // Fetch and display alternative activities
-        const activities = await fetchTimeoutNotes();
+        const activity = await fetchRandomTimeoutNote();
         clearTimeout(loadingTimeout);
-        displayAlternativeActivities(activities);
+        displayAlternativeActivities([activity]);
         
     } catch (error) {
         handleInitializationError(error, getUrlParameters());
