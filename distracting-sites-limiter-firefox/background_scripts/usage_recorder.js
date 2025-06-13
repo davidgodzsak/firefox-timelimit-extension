@@ -4,11 +4,7 @@
  * It manages timers for periodic updates and interacts with storage to persist usage data.
  */
 
-import { getUsageStats as _getUsageStats, updateUsageStats as _updateUsageStats } from './usage_storage.js';
-
-// Allow for test mocking by checking for global overrides
-const getUsageStats = global.getUsageStats || _getUsageStats;
-const updateUsageStats = global.updateUsageStats || _updateUsageStats;
+import { getUsageStats, updateUsageStats } from './usage_storage.js';
 
 const TRACKING_RESOLUTION_MS = 5000; // How often to record time spent, in milliseconds.
 

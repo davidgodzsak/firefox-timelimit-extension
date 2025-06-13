@@ -1,144 +1,638 @@
-// Function to show a status message
-function showStatus(message, isError = false) {
-    console.log('Status:', message, isError ? '(error)' : '');
-    const statusDiv = document.getElementById('status');
-    statusDiv.textContent = message;
-    statusDiv.className = isError ? 'error' : 'success';
-    setTimeout(() => {
-        statusDiv.textContent = '';
-        statusDiv.className = '';
-    }, 3000);
+/**
+ * @file settings.js
+ * @description JavaScript for the settings page of the Firefox Distraction Limiter extension
+ * Handles loading initial data, form submissions, and UI state management
+ * Communicates with background scripts via browser.runtime.sendMessage API
+ */
+
+// Ensure browser API is available (compatibility check)
+if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
+    // Use Chrome API as fallback
+    window.browser = chrome;
 }
 
-// Function to add a new distracting site
-async function addSite() {
-    console.log('Add site function called');
-    const urlPattern = document.getElementById('urlPattern').value.trim();
-    const dailyLimit = parseInt(document.getElementById('dailyLimit').value, 10);
-
-    console.log('Input values:', { urlPattern, dailyLimit });
-
-    if (!urlPattern) {
-        showStatus('Please enter a URL pattern', true);
-        return;
+/**
+ * State management for the settings page
+ */
+class SettingsManager {
+    constructor() {
+        this.distractingSites = [];
+        this.timeoutNotes = [];
+        this.isLoading = false;
+        
+        // DOM elements
+        this.elements = {
+            // Forms
+            addSiteForm: document.getElementById('add-site-form'),
+            addNoteForm: document.getElementById('add-note-form'),
+            
+            // Input fields
+            siteUrlInput: document.getElementById('site-url'),
+            timeLimitInput: document.getElementById('time-limit'),
+            noteTextInput: document.getElementById('note-text'),
+            
+            // Lists and containers
+            sitesList: document.getElementById('sites-list'),
+            notesList: document.getElementById('notes-list'),
+            sitesEmpty: document.getElementById('sites-empty'),
+            notesEmpty: document.getElementById('notes-empty'),
+            
+            // Counters
+            sitesCount: document.getElementById('sites-count'),
+            notesCount: document.getElementById('notes-count'),
+            
+            // UI elements
+            loadingOverlay: document.getElementById('loading-overlay'),
+            toastContainer: document.getElementById('toast-container')
+        };
+        
+        this.init();
     }
-    if (isNaN(dailyLimit) || dailyLimit <= 0) {
-        showStatus('Please enter a valid daily time limit', true);
-        return;
-    }
-
-    try {
-        console.log('Sending message to background script...');
-        const response = await browser.runtime.sendMessage({
-            action: 'addDistractingSite',
-            payload: {
-                urlPattern: urlPattern,
-                dailyLimitSeconds: dailyLimit
-            }
-        });
-        console.log('Response from background script:', response);
-
-        if (response) {
-            showStatus('Site added successfully!');
-            document.getElementById('urlPattern').value = '';
-            document.getElementById('dailyLimit').value = '3600';
-            loadSites(); // Refresh the site list
-        } else {
-            showStatus('Failed to add site', true);
+    
+    /**
+     * Initialize the settings manager
+     */
+    async init() {
+        try {
+            this.showLoading(true);
+            this.bindEvents();
+            await this.loadAllSettings();
+            this.renderUI();
+            
+            // Small delay to ensure UI has rendered before hiding loader
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+        } catch (error) {
+            console.error('Failed to initialize settings:', error);
+            this.showToast('Failed to load settings. Please refresh the page.', 'error');
+        } finally {
+            this.showLoading(false);
         }
-    } catch (error) {
-        console.error('Error in addSite:', error);
-        showStatus(`Error: ${error.message}`, true);
     }
-}
-
-// Function to delete a distracting site
-async function deleteSite(siteId) {
-    console.log('Delete site called for ID:', siteId);
-    try {
-        const success = await browser.runtime.sendMessage({
-            action: 'deleteDistractingSite',
-            payload: { id: siteId }
+    
+    /**
+     * Bind event listeners to form elements
+     */
+    bindEvents() {
+        // Site form submission
+        this.elements.addSiteForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleAddSite();
         });
-        console.log('Delete response:', success);
-
-        if (success) {
-            showStatus('Site deleted successfully!');
-            loadSites(); // Refresh the site list
-        } else {
-            showStatus('Failed to delete site', true);
-        }
-    } catch (error) {
-        console.error('Error in deleteSite:', error);
-        showStatus(`Error: ${error.message}`, true);
+        
+        // Note form submission
+        this.elements.addNoteForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleAddNote();
+        });
+        
+        // Input validation
+        this.elements.siteUrlInput.addEventListener('input', this.validateSiteUrl.bind(this));
+        this.elements.timeLimitInput.addEventListener('input', this.validateTimeLimit.bind(this));
+        this.elements.noteTextInput.addEventListener('input', this.validateNoteText.bind(this));
     }
-}
-
-// Function to load and display the list of distracting sites
-async function loadSites() {
-    console.log('Loading sites...');
-    try {
-        const response = await browser.runtime.sendMessage({
-            action: 'getAllSettings'
-        });
-        console.log('Loaded sites:', response);
-
-        const siteList = document.getElementById('siteList');
-        siteList.innerHTML = ''; // Clear current list
-
-        if (response && response.distractingSites) {
-            if (response.distractingSites.length === 0) {
-                siteList.innerHTML = '<p>No distracting sites added yet.</p>';
-                return;
+    
+    /**
+     * Load all settings from background script
+     */
+    async loadAllSettings() {
+        try {
+            console.log('[Settings] Attempting to load all settings...');
+            
+            // Check if browser API is available
+            if (typeof browser === 'undefined' || !browser.runtime) {
+                throw new Error('Browser extension API not available');
             }
-
-            response.distractingSites.forEach(site => {
-                const siteDiv = document.createElement('div');
-                siteDiv.style.margin = '10px 0';
-                siteDiv.style.padding = '10px';
-                siteDiv.style.backgroundColor = '#f9f9f9';
-                siteDiv.style.borderRadius = '4px';
-                siteDiv.innerHTML = `
-                    <strong>${site.urlPattern}</strong>
-                    <br>
-                    Daily limit: ${site.dailyLimitSeconds} seconds
-                    <button class="delete-btn" data-site-id="${site.id}" 
-                            style="float: right; background: #d70022;">
+            
+            console.log('[Settings] Sending getAllSettings message to background script...');
+            const response = await browser.runtime.sendMessage({
+                action: 'getAllSettings'
+            });
+            
+            console.log('[Settings] Received response:', response);
+            
+            if (response && response.success) {
+                this.distractingSites = response.data.distractingSites || [];
+                this.timeoutNotes = response.data.timeoutNotes || [];
+                console.log('[Settings] Loaded data:', {
+                    sites: this.distractingSites.length,
+                    notes: this.timeoutNotes.length
+                });
+            } else {
+                throw new Error(response?.error || 'Failed to load settings - no success response');
+            }
+        } catch (error) {
+            console.error('[Settings] Error loading settings:', error);
+            // Show more detailed error information
+            if (error.message.includes('Extension context invalidated')) {
+                throw new Error('Extension was reloaded. Please refresh this page.');
+            } else if (error.message.includes('not available')) {
+                throw new Error('Extension API not available. Please ensure this is running as an extension.');
+            } else {
+                throw new Error(`Failed to load settings: ${error.message}`);
+            }
+        }
+    }
+    
+    /**
+     * Handle adding a new distracting site
+     */
+    async handleAddSite() {
+        const urlPattern = this.elements.siteUrlInput.value.trim();
+        const timeLimit = parseInt(this.elements.timeLimitInput.value);
+        
+        // Validate inputs
+        if (!this.validateSiteUrl() || !this.validateTimeLimit()) {
+            return;
+        }
+        
+        // Check for duplicates
+        if (this.distractingSites.some(site => site.urlPattern.toLowerCase() === urlPattern.toLowerCase())) {
+            this.showToast('This site is already in your list.', 'warning');
+            return;
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'addDistractingSite',
+                payload: {
+                    urlPattern: urlPattern,
+                    dailyLimitSeconds: timeLimit * 60, // Convert minutes to seconds
+                    isEnabled: true
+                }
+            });
+            
+            if (response && response.success) {
+                this.distractingSites.push(response.data);
+                this.renderSites();
+                this.elements.addSiteForm.reset();
+                this.showToast(`Added "${urlPattern}" with ${timeLimit} minute limit.`, 'success');
+            } else {
+                throw new Error(response?.error || 'Failed to add site');
+            }
+        } catch (error) {
+            console.error('Error adding site:', error);
+            this.showToast('Failed to add site. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Handle adding a new timeout note
+     */
+    async handleAddNote() {
+        const noteText = this.elements.noteTextInput.value.trim();
+        
+        // Validate input
+        if (!this.validateNoteText()) {
+            return;
+        }
+        
+        // Check for duplicates
+        if (this.timeoutNotes.some(note => note.text.toLowerCase() === noteText.toLowerCase())) {
+            this.showToast('This note already exists.', 'warning');
+            return;
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'addTimeoutNote',
+                payload: {
+                    text: noteText
+                }
+            });
+            
+            if (response && response.success) {
+                this.timeoutNotes.push(response.data);
+                this.renderNotes();
+                this.elements.addNoteForm.reset();
+                this.showToast('Added motivational note.', 'success');
+            } else {
+                throw new Error(response?.error || 'Failed to add note');
+            }
+        } catch (error) {
+            console.error('Error adding note:', error);
+            this.showToast('Failed to add note. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Handle editing a site's time limit
+     */
+    async handleEditSite(siteId, newTimeLimit) {
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'updateDistractingSite',
+                payload: {
+                    id: siteId,
+                    updates: {
+                        dailyLimitSeconds: newTimeLimit * 60 // Convert minutes to seconds
+                    }
+                }
+            });
+            
+            if (response && response.success) {
+                const siteIndex = this.distractingSites.findIndex(site => site.id === siteId);
+                if (siteIndex !== -1) {
+                    this.distractingSites[siteIndex] = response.data;
+                    this.renderSites();
+                    this.showToast('Site updated successfully.', 'success');
+                }
+            } else {
+                throw new Error(response?.error || 'Failed to update site');
+            }
+        } catch (error) {
+            console.error('Error updating site:', error);
+            this.showToast('Failed to update site. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Handle deleting a site
+     */
+    async handleDeleteSite(siteId) {
+        if (!confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
+            return;
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'deleteDistractingSite',
+                payload: { id: siteId }
+            });
+            
+            if (response && response.success) {
+                this.distractingSites = this.distractingSites.filter(site => site.id !== siteId);
+                this.renderSites();
+                this.showToast('Site removed successfully.', 'success');
+            } else {
+                throw new Error(response?.error || 'Failed to delete site');
+            }
+        } catch (error) {
+            console.error('Error deleting site:', error);
+            this.showToast('Failed to delete site. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Handle editing a note
+     */
+    async handleEditNote(noteId, newText) {
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'updateTimeoutNote',
+                payload: {
+                    id: noteId,
+                    updates: {
+                        text: newText
+                    }
+                }
+            });
+            
+            if (response && response.success) {
+                const noteIndex = this.timeoutNotes.findIndex(note => note.id === noteId);
+                if (noteIndex !== -1) {
+                    this.timeoutNotes[noteIndex] = response.data;
+                    this.renderNotes();
+                    this.showToast('Note updated successfully.', 'success');
+                }
+            } else {
+                throw new Error(response?.error || 'Failed to update note');
+            }
+        } catch (error) {
+            console.error('Error updating note:', error);
+            this.showToast('Failed to update note. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Handle deleting a note
+     */
+    async handleDeleteNote(noteId) {
+        if (!confirm('Are you sure you want to delete this note?')) {
+            return;
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'deleteTimeoutNote',
+                payload: { id: noteId }
+            });
+            
+            if (response && response.success) {
+                this.timeoutNotes = this.timeoutNotes.filter(note => note.id !== noteId);
+                this.renderNotes();
+                this.showToast('Note removed successfully.', 'success');
+            } else {
+                throw new Error(response?.error || 'Failed to delete note');
+            }
+        } catch (error) {
+            console.error('Error deleting note:', error);
+            this.showToast('Failed to delete note. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Validate site URL input
+     */
+    validateSiteUrl() {
+        const url = this.elements.siteUrlInput.value.trim();
+        const isValid = url.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/.test(url);
+        
+        this.elements.siteUrlInput.style.borderColor = isValid ? '' : 'var(--accent-error)';
+        return isValid;
+    }
+    
+    /**
+     * Validate time limit input
+     */
+    validateTimeLimit() {
+        const timeLimit = parseInt(this.elements.timeLimitInput.value);
+        const isValid = !isNaN(timeLimit) && timeLimit > 0 && timeLimit <= 1440;
+        
+        this.elements.timeLimitInput.style.borderColor = isValid ? '' : 'var(--accent-error)';
+        return isValid;
+    }
+    
+    /**
+     * Validate note text input
+     */
+    validateNoteText() {
+        const text = this.elements.noteTextInput.value.trim();
+        const isValid = text.length > 0 && text.length <= 200;
+        
+        this.elements.noteTextInput.style.borderColor = isValid ? '' : 'var(--accent-error)';
+        return isValid;
+    }
+    
+    /**
+     * Render the entire UI
+     */
+    renderUI() {
+        this.renderSites();
+        this.renderNotes();
+    }
+    
+    /**
+     * Render the sites list
+     */
+    renderSites() {
+        // Update counter
+        this.elements.sitesCount.textContent = `${this.distractingSites.length} ${this.distractingSites.length === 1 ? 'site' : 'sites'}`;
+        
+        // Show/hide empty state
+        if (this.distractingSites.length === 0) {
+            this.elements.sitesEmpty.style.display = 'block';
+            return;
+        } else {
+            this.elements.sitesEmpty.style.display = 'none';
+        }
+        
+        // Render site items
+        const siteItems = this.distractingSites.map(site => this.createSiteItem(site));
+        
+        // Clear existing items and add new ones
+        const existingItems = this.elements.sitesList.querySelectorAll('.item-card');
+        existingItems.forEach(item => item.remove());
+        
+        siteItems.forEach(item => this.elements.sitesList.appendChild(item));
+    }
+    
+    /**
+     * Render the notes list
+     */
+    renderNotes() {
+        // Update counter
+        this.elements.notesCount.textContent = `${this.timeoutNotes.length} ${this.timeoutNotes.length === 1 ? 'note' : 'notes'}`;
+        
+        // Show/hide empty state
+        if (this.timeoutNotes.length === 0) {
+            this.elements.notesEmpty.style.display = 'block';
+            return;
+        } else {
+            this.elements.notesEmpty.style.display = 'none';
+        }
+        
+        // Render note items
+        const noteItems = this.timeoutNotes.map(note => this.createNoteItem(note));
+        
+        // Clear existing items and add new ones
+        const existingItems = this.elements.notesList.querySelectorAll('.item-card');
+        existingItems.forEach(item => item.remove());
+        
+        noteItems.forEach(item => this.elements.notesList.appendChild(item));
+    }
+    
+    /**
+     * Create a site item DOM element
+     */
+    createSiteItem(site) {
+        const timeInMinutes = Math.round(site.dailyLimitSeconds / 60);
+        
+        const item = document.createElement('div');
+        item.className = 'item-card';
+        item.role = 'listitem';
+        
+        item.innerHTML = `
+            <div class="item-content">
+                <div class="item-info">
+                    <div class="item-title">${this.escapeHtml(site.urlPattern)}</div>
+                    <div class="item-subtitle">${timeInMinutes} minute${timeInMinutes !== 1 ? 's' : ''} daily limit</div>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-secondary btn-small edit-site-btn" data-site-id="${site.id}" aria-label="Edit ${site.urlPattern}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        Edit
+                    </button>
+                    <button class="btn btn-danger btn-small delete-site-btn" data-site-id="${site.id}" aria-label="Delete ${site.urlPattern}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3,6 5,6 21,6"/>
+                            <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"/>
+                        </svg>
                         Delete
                     </button>
-                `;
-                siteList.appendChild(siteDiv);
-            });
-
-            // Add event listeners to delete buttons
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const siteId = e.target.dataset.siteId;
-                    deleteSite(siteId);
-                });
-            });
-        } else {
-            siteList.innerHTML = '<p>Error loading sites.</p>';
+                </div>
+            </div>
+        `;
+        
+        // Bind event listeners
+        const editBtn = item.querySelector('.edit-site-btn');
+        const deleteBtn = item.querySelector('.delete-site-btn');
+        
+        editBtn.addEventListener('click', () => this.promptEditSite(site));
+        deleteBtn.addEventListener('click', () => this.handleDeleteSite(site.id));
+        
+        return item;
+    }
+    
+    /**
+     * Create a note item DOM element
+     */
+    createNoteItem(note) {
+        const item = document.createElement('div');
+        item.className = 'item-card';
+        item.role = 'listitem';
+        
+        item.innerHTML = `
+            <div class="item-content">
+                <div class="item-info">
+                    <div class="item-title">${this.escapeHtml(note.text)}</div>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-secondary btn-small edit-note-btn" data-note-id="${note.id}" aria-label="Edit note">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        Edit
+                    </button>
+                    <button class="btn btn-danger btn-small delete-note-btn" data-note-id="${note.id}" aria-label="Delete note">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3,6 5,6 21,6"/>
+                            <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"/>
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Bind event listeners
+        const editBtn = item.querySelector('.edit-note-btn');
+        const deleteBtn = item.querySelector('.delete-note-btn');
+        
+        editBtn.addEventListener('click', () => this.promptEditNote(note));
+        deleteBtn.addEventListener('click', () => this.handleDeleteNote(note.id));
+        
+        return item;
+    }
+    
+    /**
+     * Prompt user to edit a site's time limit
+     */
+    promptEditSite(site) {
+        const currentMinutes = Math.round(site.dailyLimitSeconds / 60);
+        const newMinutes = prompt(`Edit time limit for ${site.urlPattern}:`, currentMinutes);
+        
+        if (newMinutes !== null) {
+            const minutes = parseInt(newMinutes);
+            if (!isNaN(minutes) && minutes > 0 && minutes <= 1440) {
+                this.handleEditSite(site.id, minutes);
+            } else {
+                this.showToast('Please enter a valid time limit (1-1440 minutes).', 'warning');
+            }
         }
-    } catch (error) {
-        console.error('Error in loadSites:', error);
-        showStatus(`Error: ${error.message}`, true);
+    }
+    
+    /**
+     * Prompt user to edit a note
+     */
+    promptEditNote(note) {
+        const newText = prompt('Edit motivational note:', note.text);
+        
+        if (newText !== null && newText.trim() !== '') {
+            const trimmedText = newText.trim();
+            if (trimmedText.length <= 200) {
+                this.handleEditNote(note.id, trimmedText);
+            } else {
+                this.showToast('Note must be 200 characters or less.', 'warning');
+            }
+        }
+    }
+    
+    /**
+     * Show or hide loading overlay
+     */
+    showLoading(show) {
+        console.log(`[Settings] showLoading(${show})`);
+        this.isLoading = show;
+        
+        if (!this.elements.loadingOverlay) {
+            console.error('[Settings] Loading overlay element not found!');
+            return;
+        }
+        
+        if (show) {
+            this.elements.loadingOverlay.classList.remove('hidden');
+        } else {
+            this.elements.loadingOverlay.classList.add('hidden');
+        }
+        
+        console.log(`[Settings] Loading overlay classes: ${this.elements.loadingOverlay.className}`);
+    }
+    
+    /**
+     * Show a toast notification
+     */
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const icons = {
+            success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>',
+            error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+            warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21,16-10-17L1,16z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        };
+        
+        toast.innerHTML = `
+            <div class="toast-icon">${icons[type]}</div>
+            <p class="toast-message">${this.escapeHtml(message)}</p>
+            <button class="toast-close" aria-label="Close notification">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        `;
+        
+        // Add close handler
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => toast.remove());
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => toast.remove(), 5000);
+        
+        this.elements.toastContainer.appendChild(toast);
+    }
+    
+    /**
+     * Escape HTML entities to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 
-// Initialize event listeners when the page loads
+// Initialize the settings manager when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Settings page loaded');
-    
-    // Add click handler for the add site button
-    const addButton = document.getElementById('addSiteBtn');
-    if (addButton) {
-        console.log('Add button found, adding click listener');
-        addButton.addEventListener('click', addSite);
-    } else {
-        console.error('Add button not found!');
-    }
-
-    // Load initial sites
-    loadSites();
+    new SettingsManager();
 }); 

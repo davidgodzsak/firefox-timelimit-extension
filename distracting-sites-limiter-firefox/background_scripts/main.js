@@ -155,7 +155,10 @@ async function handleMessage(message) {
           getDistractingSites(),
           getTimeoutNotes()
         ]);
-        return { distractingSites, timeoutNotes };
+        return { 
+          success: true, 
+          data: { distractingSites, timeoutNotes } 
+        };
       }
       
       // === Distracting Sites Management ===
@@ -166,7 +169,10 @@ async function handleMessage(message) {
         const newSite = await addDistractingSite(message.payload);
         // Reload distraction detector cache when sites change
         await _reloadDistractionDetectorCache();
-        return newSite;
+        return { 
+          success: true, 
+          data: newSite 
+        };
       }
       
       case 'updateDistractingSite': {
@@ -175,7 +181,10 @@ async function handleMessage(message) {
         }
         const updatedSite = await updateDistractingSite(message.payload.id, message.payload.updates);
         await _reloadDistractionDetectorCache();
-        return updatedSite;
+        return { 
+          success: true, 
+          data: updatedSite 
+        };
       }
       
       case 'deleteDistractingSite': {
@@ -184,7 +193,10 @@ async function handleMessage(message) {
         }
         const deleteResult = await deleteDistractingSite(message.payload.id);
         await _reloadDistractionDetectorCache();
-        return deleteResult;
+        return { 
+          success: true, 
+          data: deleteResult 
+        };
       }
       
       // === Timeout Notes Management ===
@@ -192,51 +204,85 @@ async function handleMessage(message) {
         if (!message.payload) {
           throw new Error('Payload required for addTimeoutNote');
         }
-        return await addTimeoutNote(message.payload);
+        const newNote = await addTimeoutNote(message.payload);
+        return { 
+          success: true, 
+          data: newNote 
+        };
       }
       
       case 'updateTimeoutNote': {
         if (!message.payload || !message.payload.id) {
           throw new Error('Payload with id required for updateTimeoutNote');
         }
-        return await updateTimeoutNote(message.payload.id, message.payload.updates);
+        const updatedNote = await updateTimeoutNote(message.payload.id, message.payload.updates);
+        return { 
+          success: true, 
+          data: updatedNote 
+        };
       }
       
       case 'deleteTimeoutNote': {
         if (!message.payload || !message.payload.id) {
           throw new Error('Payload with id required for deleteTimeoutNote');
         }
-        return await deleteTimeoutNote(message.payload.id);
+        const deleteResult = await deleteTimeoutNote(message.payload.id);
+        return { 
+          success: true, 
+          data: deleteResult 
+        };
       }
       
       // === Timeout Page API ===
-      case 'getTimeoutNotes':
-        return await getTimeoutNotes();
+      case 'getTimeoutNotes': {
+        const notes = await getTimeoutNotes();
+        return { 
+          success: true, 
+          data: notes 
+        };
+      }
       
       case 'getRandomTimeoutNote': {
         const notes = await getTimeoutNotes();
         if (notes && notes.length > 0) {
           const randomIndex = Math.floor(Math.random() * notes.length);
-          return notes[randomIndex];
+          return { 
+            success: true, 
+            data: notes[randomIndex] 
+          };
         }
-        return null;
+        return { 
+          success: true, 
+          data: null 
+        };
       }
       
       // === Debug/Status API ===
-      case 'getSystemStatus':
-        return {
+      case 'getSystemStatus': {
+        const status = {
           isActive: _orchestrationState.isSystemActive,
           currentlyTrackedSiteId: _orchestrationState.currentlyTrackedSiteId,
           lastActiveUrl: _orchestrationState.lastActiveUrl,
         };
+        return { 
+          success: true, 
+          data: status 
+        };
+      }
       
       default:
         console.warn('[Main] Unknown message action:', message.action);
-        return { error: `Unknown action: ${message.action}` };
+        return { 
+          success: false, 
+          error: `Unknown action: ${message.action}` 
+        };
     }
   } catch (error) {
     console.error('[Main] Error handling message:', error);
-    return { error: error.message };
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 }
 

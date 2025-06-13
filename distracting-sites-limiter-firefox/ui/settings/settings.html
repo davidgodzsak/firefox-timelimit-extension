@@ -1,88 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Distraction Limiter Settings</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 0 20px;
-        }
-        .site-list {
-            margin: 20px 0;
-        }
-        .add-site-form {
-            margin: 20px 0;
-            padding: 20px;
-            background: #f5f5f5;
-            border-radius: 8px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        input[type="text"],
-        input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            background: #0060df;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #003eaa;
-        }
-        #status {
-            margin: 20px 0;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .success {
-            background: #e6ffe6;
-            color: #006700;
-        }
-        .error {
-            background: #ffe6e6;
-            color: #670000;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firefox Distraction Limiter - Settings</title>
+    <link rel="stylesheet" href="../common_assets/css/variables.css">
+    <link rel="stylesheet" href="../common_assets/css/global.css">
+    <link rel="stylesheet" href="settings.css">
 </head>
 <body>
-    <h1>Distraction Limiter Settings</h1>
-    
-    <div class="add-site-form">
-        <h2>Add Distracting Site</h2>
-        <div class="form-group">
-            <label for="urlPattern">Site URL Pattern (e.g., "youtube.com"):</label>
-            <input type="text" id="urlPattern" required>
+    <div class="container">
+        <header class="settings-header">
+            <div class="header-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="m12 1 0 6m0 6 0 6"/>
+                    <path d="m1 12 6 0m6 0 6 0"/>
+                </svg>
+            </div>
+            <h1 class="settings-title">Firefox Distraction Limiter</h1>
+            <p class="settings-subtitle">Manage your distracting sites and motivational notes</p>
+        </header>
+
+        <main class="settings-main">
+            <!-- Distracting Sites Section -->
+            <section class="settings-section" id="sites-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12,6 12,12 16,14"/>
+                        </svg>
+                        Distracting Sites
+                    </h2>
+                    <p class="section-description">Set time limits for websites that distract you</p>
+                </div>
+
+                <div class="add-form-container">
+                    <form class="add-form" id="add-site-form" aria-label="Add new distracting site">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="site-url" class="form-label">Website URL</label>
+                                <input 
+                                    type="text" 
+                                    id="site-url" 
+                                    name="siteUrl" 
+                                    class="form-input" 
+                                    placeholder="e.g., youtube.com, facebook.com"
+                                    aria-describedby="site-url-help"
+                                    required
+                                >
+                                <small id="site-url-help" class="form-help">Enter the domain name (without http://)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="time-limit" class="form-label">Daily Time Limit (minutes)</label>
+                                <input 
+                                    type="number" 
+                                    id="time-limit" 
+                                    name="timeLimit" 
+                                    class="form-input" 
+                                    placeholder="60"
+                                    min="1"
+                                    max="1440"
+                                    aria-describedby="time-limit-help"
+                                    required
+                                >
+                                <small id="time-limit-help" class="form-help">Maximum 1440 minutes (24 hours)</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary" aria-label="Add site">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="8" x2="12" y2="16"/>
+                                    <line x1="8" y1="12" x2="16" y2="12"/>
+                                </svg>
+                                Add Site
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="items-container">
+                    <div class="items-header">
+                        <h3 class="items-title">Your Distracting Sites</h3>
+                        <span class="items-count" id="sites-count">0 sites</span>
+                    </div>
+                    <div class="items-list" id="sites-list" role="list" aria-label="List of distracting sites">
+                        <div class="items-empty" id="sites-empty">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            <p>No distracting sites configured yet</p>
+                            <span>Add your first site above to get started</span>
+                        </div>
+                        <!-- Sites will be populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Timeout Notes Section -->
+            <section class="settings-section" id="notes-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <polyline points="9,22 9,12 15,12 15,22"/>
+                        </svg>
+                        Motivational Notes
+                    </h2>
+                    <p class="section-description">Add alternative activities to show when sites are blocked</p>
+                </div>
+
+                <div class="add-form-container">
+                    <form class="add-form" id="add-note-form" aria-label="Add new motivational note">
+                        <div class="form-row">
+                            <div class="form-group flex-grow">
+                                <label for="note-text" class="form-label">Activity Suggestion</label>
+                                <input 
+                                    type="text" 
+                                    id="note-text" 
+                                    name="noteText" 
+                                    class="form-input" 
+                                    placeholder="e.g., Go for a walk, Play the guitar, Read a book"
+                                    aria-describedby="note-text-help"
+                                    maxlength="200"
+                                    required
+                                >
+                                <small id="note-text-help" class="form-help">Suggest something positive to do instead</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary" aria-label="Add note">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="8" x2="12" y2="16"/>
+                                    <line x1="8" y1="12" x2="16" y2="12"/>
+                                </svg>
+                                Add Note
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="items-container">
+                    <div class="items-header">
+                        <h3 class="items-title">Your Motivational Notes</h3>
+                        <span class="items-count" id="notes-count">0 notes</span>
+                    </div>
+                    <div class="items-list" id="notes-list" role="list" aria-label="List of motivational notes">
+                        <div class="items-empty" id="notes-empty">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9,22 9,12 15,12 15,22"/>
+                            </svg>
+                            <p>No motivational notes yet</p>
+                            <span>Add some positive alternatives above</span>
+                        </div>
+                        <!-- Notes will be populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast notifications -->
+        <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true">
+            <!-- Toast messages will be inserted here -->
         </div>
-        <div class="form-group">
-            <label for="dailyLimit">Daily Time Limit (seconds):</label>
-            <input type="number" id="dailyLimit" min="1" value="3600" required>
+
+        <!-- Loading overlay -->
+        <div class="loading-overlay hidden" id="loading-overlay">
+            <div class="loading-spinner">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                </svg>
+                <span>Loading...</span>
+            </div>
         </div>
-        <button id="addSiteBtn">Add Site</button>
     </div>
 
-    <div id="status"></div>
-    
-    <div class="site-list">
-        <h2>Current Distracting Sites</h2>
-        <div id="siteList"></div>
-    </div>
-
-    <script src="/assets/browser-polyfill.js"></script>
+    <script src="error-handler.js"></script>
     <script src="settings.js"></script>
 </body>
 </html> 
