@@ -34,6 +34,14 @@ import { handlePotentialRedirect } from './site_blocker.js';
 import { getDistractingSites, addDistractingSite, updateDistractingSite, deleteDistractingSite } from './site_storage.js';
 import { getTimeoutNotes, addTimeoutNote, updateTimeoutNote, deleteTimeoutNote } from './note_storage.js';
 
+// Enhanced validation and error handling utilities
+import { 
+  categorizeError, 
+  validateRequiredFields, 
+  safeBrowserApiCall,
+  ERROR_TYPES 
+} from './validation_utils.js';
+
 /**
  * Current tracking state for orchestration
  * @private
@@ -138,14 +146,44 @@ async function handleTabActivityChange(activityInfo) {
 /**
  * Handles incoming messages from UI components (settings page, timeout page).
  * Provides an API for UI components to interact with the background script data and functionality.
+ * Enhanced with better error categorization and validation.
  * 
  * @param {Object} message - The message object sent from UI
  * @param {string} message.action - The action to perform
  * @param {Object} [message.payload] - Data associated with the action
+ * @param {Object} sender - Information about the message sender
+ * @param {Function} sendResponse - Function to send response back
  * @returns {Promise<any>|boolean} Response data or boolean indicating async response
  */
-async function handleMessage(message) {
+async function handleMessage(message, sender, sendResponse) {
   console.log('[Main] Received message:', message.action, message.payload);
+  
+  // Validate basic message structure
+  if (!message || typeof message !== 'object') {
+    const errorResponse = {
+      success: false,
+      error: {
+        message: 'Invalid message format',
+        type: ERROR_TYPES.VALIDATION,
+        isRetryable: false
+      }
+    };
+    console.error('[Main] Invalid message format:', message);
+    return errorResponse;
+  }
+
+  if (!message.action || typeof message.action !== 'string') {
+    const errorResponse = {
+      success: false,
+      error: {
+        message: 'Message action is required',
+        type: ERROR_TYPES.VALIDATION,
+        isRetryable: false
+      }
+    };
+    console.error('[Main] Missing or invalid action:', message.action);
+    return errorResponse;
+  }
   
   try {
     switch (message.action) {
@@ -157,79 +195,212 @@ async function handleMessage(message) {
         ]);
         return { 
           success: true, 
-          data: { distractingSites, timeoutNotes } 
+          data: { distractingSites, timeoutNotes },
+          error: null
         };
       }
       
       // === Distracting Sites Management ===
       case 'addDistractingSite': {
-        if (!message.payload) {
-          throw new Error('Payload required for addDistractingSite');
+        const validation = validateRequiredFields(message.payload, ['urlPattern', 'dailyLimitSeconds']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
         }
+        
         const newSite = await addDistractingSite(message.payload);
+        if (!newSite) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to add site. Please check the URL format and try again.',
+              type: ERROR_TYPES.STORAGE,
+              isRetryable: true
+            }
+          };
+        }
+        
         // Reload distraction detector cache when sites change
         await _reloadDistractionDetectorCache();
         return { 
           success: true, 
-          data: newSite 
+          data: newSite,
+          error: null
         };
       }
       
       case 'updateDistractingSite': {
-        if (!message.payload || !message.payload.id) {
-          throw new Error('Payload with id required for updateDistractingSite');
+        const validation = validateRequiredFields(message.payload, ['id', 'updates']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
         }
+        
         const updatedSite = await updateDistractingSite(message.payload.id, message.payload.updates);
+        if (!updatedSite) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to update site. Site may not exist or update data is invalid.',
+              type: ERROR_TYPES.STORAGE,
+              isRetryable: true
+            }
+          };
+        }
+        
         await _reloadDistractionDetectorCache();
         return { 
           success: true, 
-          data: updatedSite 
+          data: updatedSite,
+          error: null
         };
       }
       
       case 'deleteDistractingSite': {
-        if (!message.payload || !message.payload.id) {
-          throw new Error('Payload with id required for deleteDistractingSite');
+        const validation = validateRequiredFields(message.payload, ['id']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
         }
+        
         const deleteResult = await deleteDistractingSite(message.payload.id);
+        if (!deleteResult) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to delete site. Site may not exist.',
+              type: ERROR_TYPES.STORAGE,
+              isRetryable: true
+            }
+          };
+        }
+        
         await _reloadDistractionDetectorCache();
         return { 
           success: true, 
-          data: deleteResult 
+          data: { deleted: true, id: message.payload.id },
+          error: null
         };
       }
       
       // === Timeout Notes Management ===
       case 'addTimeoutNote': {
-        if (!message.payload) {
-          throw new Error('Payload required for addTimeoutNote');
+        const validation = validateRequiredFields(message.payload, ['text']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
         }
+        
         const newNote = await addTimeoutNote(message.payload);
+        if (!newNote) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to add note. Please check the note text and try again.',
+              type: ERROR_TYPES.STORAGE,
+              isRetryable: true
+            }
+          };
+        }
+        
         return { 
           success: true, 
-          data: newNote 
+          data: newNote,
+          error: null
         };
       }
       
       case 'updateTimeoutNote': {
-        if (!message.payload || !message.payload.id) {
-          throw new Error('Payload with id required for updateTimeoutNote');
+        const validation = validateRequiredFields(message.payload, ['id', 'updates']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
         }
+        
         const updatedNote = await updateTimeoutNote(message.payload.id, message.payload.updates);
+        if (!updatedNote) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to update note. Note may not exist or update data is invalid.',
+              type: ERROR_TYPES.STORAGE,
+              isRetryable: true
+            }
+          };
+        }
+        
         return { 
           success: true, 
-          data: updatedNote 
+          data: updatedNote,
+          error: null
         };
       }
       
       case 'deleteTimeoutNote': {
-        if (!message.payload || !message.payload.id) {
-          throw new Error('Payload with id required for deleteTimeoutNote');
+        const validation = validateRequiredFields(message.payload, ['id']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
         }
+        
         const deleteResult = await deleteTimeoutNote(message.payload.id);
+        if (!deleteResult) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to delete note. Note may not exist.',
+              type: ERROR_TYPES.STORAGE,  
+              isRetryable: true
+            }
+          };
+        }
+        
         return { 
           success: true, 
-          data: deleteResult 
+          data: { deleted: true, id: message.payload.id },
+          error: null
         };
       }
       
@@ -238,7 +409,8 @@ async function handleMessage(message) {
         const notes = await getTimeoutNotes();
         return { 
           success: true, 
-          data: notes 
+          data: notes,
+          error: null
         };
       }
       
@@ -248,12 +420,14 @@ async function handleMessage(message) {
           const randomIndex = Math.floor(Math.random() * notes.length);
           return { 
             success: true, 
-            data: notes[randomIndex] 
+            data: notes[randomIndex],
+            error: null
           };
         }
         return { 
           success: true, 
-          data: null 
+          data: null,
+          error: null
         };
       }
       
@@ -263,10 +437,12 @@ async function handleMessage(message) {
           isActive: _orchestrationState.isSystemActive,
           currentlyTrackedSiteId: _orchestrationState.currentlyTrackedSiteId,
           lastActiveUrl: _orchestrationState.lastActiveUrl,
+          timestamp: Date.now()
         };
         return { 
           success: true, 
-          data: status 
+          data: status,
+          error: null
         };
       }
       
@@ -274,14 +450,25 @@ async function handleMessage(message) {
         console.warn('[Main] Unknown message action:', message.action);
         return { 
           success: false, 
-          error: `Unknown action: ${message.action}` 
+          error: {
+            message: `Unknown action: ${message.action}`,
+            type: ERROR_TYPES.VALIDATION,
+            isRetryable: false
+          }
         };
     }
   } catch (error) {
     console.error('[Main] Error handling message:', error);
+    
+    const categorized = categorizeError(error);
     return { 
       success: false, 
-      error: error.message 
+      error: {
+        message: categorized.userMessage,
+        type: categorized.type,
+        isRetryable: categorized.isRetryable,
+        originalError: error.message
+      }
     };
   }
 }
@@ -289,6 +476,7 @@ async function handleMessage(message) {
 /**
  * Helper function to reload the distraction detector cache when sites change.
  * This ensures the detector always has up-to-date site information.
+ * Enhanced with better error handling.
  * @private
  */
 async function _reloadDistractionDetectorCache() {
@@ -299,38 +487,73 @@ async function _reloadDistractionDetectorCache() {
     console.log('[Main] Reloaded distraction detector cache after sites change');
   } catch (error) {
     console.error('[Main] Error reloading distraction detector cache:', error);
+    // This is not critical for functionality, so we continue without throwing
   }
 }
 
 /**
  * Initializes all background script modules and sets up orchestration.
  * This is the main startup function called when the background script loads.
+ * Enhanced with better error handling and recovery.
  */
 async function initialize() {
   console.log('[Main] Initializing Firefox Distraction Limiter background script...');
   
+  const initializationErrors = [];
+  
   try {
-    // Initialize core modules
+    // Initialize core modules with individual error handling
     console.log('[Main] Initializing daily reset alarm...');
-    await initializeDailyResetAlarm();
+    try {
+      await initializeDailyResetAlarm();
+    } catch (error) {
+      console.error('[Main] Failed to initialize daily reset alarm:', error);
+      initializationErrors.push({ module: 'daily_reset', error: error.message });
+    }
     
     console.log('[Main] Initializing usage recorder...');
-    initializeUsageRecorder();
+    try {
+      initializeUsageRecorder();
+    } catch (error) {
+      console.error('[Main] Failed to initialize usage recorder:', error);
+      initializationErrors.push({ module: 'usage_recorder', error: error.message });
+    }
     
     console.log('[Main] Initializing distraction detector...');
-    await initializeDistractionDetector();
+    try {
+      await initializeDistractionDetector();
+    } catch (error) {
+      console.error('[Main] Failed to initialize distraction detector:', error);
+      initializationErrors.push({ module: 'distraction_detector', error: error.message });
+    }
     
     console.log('[Main] Initializing tab activity monitor...');
-    await initializeTabActivityMonitor(handleTabActivityChange);
+    try {
+      await initializeTabActivityMonitor(handleTabActivityChange);
+    } catch (error) {
+      console.error('[Main] Failed to initialize tab activity monitor:', error);
+      initializationErrors.push({ module: 'tab_activity_monitor', error: error.message });
+    }
     
     // Set up message listener for UI communication
-    browser.runtime.onMessage.addListener(handleMessage);
+    try {
+      browser.runtime.onMessage.addListener(handleMessage);
+      console.log('[Main] Message listener set up successfully');
+    } catch (error) {
+      console.error('[Main] Failed to set up message listener:', error);
+      initializationErrors.push({ module: 'message_listener', error: error.message });
+    }
     
-    console.log('[Main] Background script initialization complete');
+    if (initializationErrors.length > 0) {
+      console.warn('[Main] Background script initialized with errors:', initializationErrors);
+      // Extension can still function with some modules failing
+    } else {
+      console.log('[Main] Background script initialization complete - all modules loaded successfully');
+    }
     
   } catch (error) {
-    console.error('[Main] Error during initialization:', error);
-    // Continue running even if some modules fail to initialize
+    console.error('[Main] Critical error during initialization:', error);
+    // Even with critical errors, try to continue with basic functionality
   }
 }
 
@@ -339,6 +562,7 @@ async function initialize() {
 // Initialize the extension when the background script loads
 initialize().catch(error => {
   console.error('[Main] Fatal error during initialization:', error);
+  // Extension will continue to run with limited functionality
 });
 
 console.log('[Main] Firefox Distraction Limiter background script loaded');

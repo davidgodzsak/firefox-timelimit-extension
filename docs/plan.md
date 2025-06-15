@@ -350,7 +350,7 @@ I will now generate the plan in the requested markdown format.
 
 ## Phase 5: Testing & Refinement
 
-  - [ ] Step 5.1: Integration Testing - Settings UI with Background
+  - [x] Step 5.1: Integration Testing - Settings UI with Background
 
       * **Task**: Create `tests/integration/settings_background_interaction.test.js`. Write tests to verify that actions in the Settings UI (add/edit/delete sites and notes) correctly communicate with the background script and result in data being updated in mock storage. This may involve using tools that can interact with WebExtension popups/options pages or focusing on message passing.
       * **Files**:
@@ -366,7 +366,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/common_assets/css/*`
       * **Step Dependencies**: Phase 3, Phase 4.
 
-  - [ ] Step 5.3: Comprehensive Error Handling and Input Validation Review
+  - [x] Step 5.3: Comprehensive Error Handling and Input Validation Review
 
       * **Task**: Systematically review all JavaScript files (`storage_manager.js`, background logic modules, UI scripts). Ensure `try...catch` blocks are used for fallible operations (especially `browser` API calls and storage). Verify all user inputs are validated on the client-side (Settings UI) and, if necessary, again in the background script before storage. Ensure meaningful error messages or feedback.
       * **Files**: All relevant `.js` files across the project.

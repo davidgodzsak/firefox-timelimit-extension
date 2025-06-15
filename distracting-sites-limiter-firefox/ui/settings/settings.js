@@ -119,15 +119,26 @@ class SettingsManager {
                     notes: this.timeoutNotes.length
                 });
             } else {
-                throw new Error(response?.error || 'Failed to load settings - no success response');
+                // Enhanced error handling
+                const error = response?.error;
+                if (error?.type === 'EXTENSION_CONTEXT_ERROR') {
+                    throw new Error(error.message || 'Extension context invalidated');
+                } else if (error?.type === 'STORAGE_ERROR') {
+                    throw new Error(error.message || 'Storage error occurred');
+                } else {
+                    throw new Error(error?.message || 'Failed to load settings - no success response');
+                }
             }
         } catch (error) {
             console.error('[Settings] Error loading settings:', error);
             // Show more detailed error information
-            if (error.message.includes('Extension context invalidated')) {
+            if (error.message.includes('Extension context invalidated') || 
+                error.message.includes('Extension was reloaded')) {
                 throw new Error('Extension was reloaded. Please refresh this page.');
             } else if (error.message.includes('not available')) {
                 throw new Error('Extension API not available. Please ensure this is running as an extension.');
+            } else if (error.message.includes('Storage error')) {
+                throw new Error('Failed to load settings from storage. Please try refreshing the page.');
             } else {
                 throw new Error(`Failed to load settings: ${error.message}`);
             }
@@ -170,11 +181,37 @@ class SettingsManager {
                 this.elements.addSiteForm.reset();
                 this.showToast(`Added "${urlPattern}" with ${timeLimit} minute limit.`, 'success');
             } else {
-                throw new Error(response?.error || 'Failed to add site');
+                // Enhanced error handling based on error type
+                const error = response?.error;
+                if (error?.type === 'VALIDATION_ERROR') {
+                    this.showToast(`Validation error: ${error.message}`, 'error');
+                    // Focus on the problematic field if available
+                    if (error.field === 'urlPattern') {
+                        this.elements.siteUrlInput.focus();
+                    } else if (error.field === 'dailyLimitSeconds') {
+                        this.elements.timeLimitInput.focus();
+                    }
+                } else if (error?.type === 'STORAGE_ERROR') {
+                    this.showToast(error.message || 'Storage error occurred. Please try again.', 'error');
+                } else if (error?.type === 'EXTENSION_CONTEXT_ERROR') {
+                    this.showToast(error.message || 'Extension was reloaded. Please refresh this page.', 'error');
+                    // Optionally offer to reload the page
+                    setTimeout(() => {
+                        if (confirm('Would you like to refresh the page now?')) {
+                            location.reload();
+                        }
+                    }, 2000);
+                } else {
+                    this.showToast(error?.message || 'Failed to add site. Please try again.', 'error');
+                }
             }
         } catch (error) {
             console.error('Error adding site:', error);
-            this.showToast('Failed to add site. Please try again.', 'error');
+            if (error.message.includes('Extension context invalidated')) {
+                this.showToast('Extension was reloaded. Please refresh this page.', 'error');
+            } else {
+                this.showToast('Failed to add site. Please try again.', 'error');
+            }
         } finally {
             this.showLoading(false);
         }
@@ -211,13 +248,35 @@ class SettingsManager {
                 this.timeoutNotes.push(response.data);
                 this.renderNotes();
                 this.elements.addNoteForm.reset();
-                this.showToast('Added motivational note.', 'success');
+                this.showToast('Note added successfully.', 'success');
             } else {
-                throw new Error(response?.error || 'Failed to add note');
+                // Enhanced error handling based on error type
+                const error = response?.error;
+                if (error?.type === 'VALIDATION_ERROR') {
+                    this.showToast(`Validation error: ${error.message}`, 'error');
+                    if (error.field === 'text') {
+                        this.elements.noteTextInput.focus();
+                    }
+                } else if (error?.type === 'STORAGE_ERROR') {
+                    this.showToast(error.message || 'Storage error occurred. Please try again.', 'error');
+                } else if (error?.type === 'EXTENSION_CONTEXT_ERROR') {
+                    this.showToast(error.message || 'Extension was reloaded. Please refresh this page.', 'error');
+                    setTimeout(() => {
+                        if (confirm('Would you like to refresh the page now?')) {
+                            location.reload();
+                        }
+                    }, 2000);
+                } else {
+                    this.showToast(error?.message || 'Failed to add note. Please try again.', 'error');
+                }
             }
         } catch (error) {
             console.error('Error adding note:', error);
-            this.showToast('Failed to add note. Please try again.', 'error');
+            if (error.message.includes('Extension context invalidated')) {
+                this.showToast('Extension was reloaded. Please refresh this page.', 'error');
+            } else {
+                this.showToast('Failed to add note. Please try again.', 'error');
+            }
         } finally {
             this.showLoading(false);
         }
@@ -359,11 +418,46 @@ class SettingsManager {
      * Validate site URL input
      */
     validateSiteUrl() {
-        const url = this.elements.siteUrlInput.value.trim();
-        const isValid = url.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/.test(url);
+        const urlPattern = this.elements.siteUrlInput.value.trim();
+        const errorElement = this.elements.siteUrlInput.parentElement.querySelector('.error-message');
         
-        this.elements.siteUrlInput.style.borderColor = isValid ? '' : 'var(--accent-error)';
-        return isValid;
+        // Remove existing error message
+        if (errorElement) {
+            errorElement.remove();
+        }
+        
+        // Basic validation
+        if (!urlPattern) {
+            this.showFieldError(this.elements.siteUrlInput, 'URL is required');
+            return false;
+        }
+        
+        // Enhanced URL validation
+        if (urlPattern.length > 2000) {
+            this.showFieldError(this.elements.siteUrlInput, 'URL is too long (max 2000 characters)');
+            return false;
+        }
+        
+        // Check for dangerous patterns
+        const dangerousPatterns = ['javascript:', 'data:', 'file:', 'chrome:', 'moz-extension:'];
+        if (dangerousPatterns.some(pattern => urlPattern.toLowerCase().includes(pattern))) {
+            this.showFieldError(this.elements.siteUrlInput, 'Invalid URL pattern contains restricted protocol');
+            return false;
+        }
+        
+        // Basic hostname validation
+        const normalized = urlPattern.toLowerCase()
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '');
+        
+        const hostnameRegex = /^[a-z0-9.-]+[a-z0-9]$/;
+        if (!hostnameRegex.test(normalized.split('/')[0])) {
+            this.showFieldError(this.elements.siteUrlInput, 'Please enter a valid domain (e.g., example.com)');
+            return false;
+        }
+        
+        this.elements.siteUrlInput.classList.remove('error');
+        return true;
     }
     
     /**
@@ -371,21 +465,69 @@ class SettingsManager {
      */
     validateTimeLimit() {
         const timeLimit = parseInt(this.elements.timeLimitInput.value);
-        const isValid = !isNaN(timeLimit) && timeLimit > 0 && timeLimit <= 1440;
+        const errorElement = this.elements.timeLimitInput.parentElement.querySelector('.error-message');
         
-        this.elements.timeLimitInput.style.borderColor = isValid ? '' : 'var(--accent-error)';
-        return isValid;
+        // Remove existing error message
+        if (errorElement) {
+            errorElement.remove();
+        }
+        
+        if (isNaN(timeLimit) || timeLimit <= 0) {
+            this.showFieldError(this.elements.timeLimitInput, 'Time limit must be a positive number');
+            return false;
+        }
+        
+        if (timeLimit > 1440) { // 24 hours in minutes
+            this.showFieldError(this.elements.timeLimitInput, 'Time limit cannot exceed 24 hours');
+            return false;
+        }
+        
+        this.elements.timeLimitInput.classList.remove('error');
+        return true;
     }
     
     /**
      * Validate note text input
      */
     validateNoteText() {
-        const text = this.elements.noteTextInput.value.trim();
-        const isValid = text.length > 0 && text.length <= 200;
+        const noteText = this.elements.noteTextInput.value.trim();
+        const errorElement = this.elements.noteTextInput.parentElement.querySelector('.error-message');
         
-        this.elements.noteTextInput.style.borderColor = isValid ? '' : 'var(--accent-error)';
-        return isValid;
+        // Remove existing error message
+        if (errorElement) {
+            errorElement.remove();
+        }
+        
+        if (!noteText) {
+            this.showFieldError(this.elements.noteTextInput, 'Note text is required');
+            return false;
+        }
+        
+        if (noteText.length > 1000) {
+            this.showFieldError(this.elements.noteTextInput, 'Note text is too long (max 1000 characters)');
+            return false;
+        }
+        
+        this.elements.noteTextInput.classList.remove('error');
+        return true;
+    }
+    
+    /**
+     * Show field-specific error message
+     */
+    showFieldError(inputElement, message) {
+        inputElement.classList.add('error');
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+            color: #dc2626;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        `;
+        
+        inputElement.parentElement.appendChild(errorDiv);
     }
     
     /**
