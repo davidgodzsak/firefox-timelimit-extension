@@ -1,0 +1,5 @@
+- On the timout page, next to the motivational message show a shuffle icon, and when the user clicks on it it should change the motivational message and show another random one.
+- Add a button with an icon next to the search bar, when the user clicks on it, they can add a time limit to the page being open
+- Add limit on number of opens. So let user limit how many times a page can be open. Entering a page as entering an open tabs should count as an open. 
+- The plugin should show a textbox next to the icon next to the searchbar with how many opens are left and how many minutes are left
+- 

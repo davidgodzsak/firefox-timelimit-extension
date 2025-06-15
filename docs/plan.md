@@ -189,14 +189,14 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/site_blocker.js`: Add redirection logic.
       * **Step Dependencies**: Step 2.6. (A placeholder `ui/timeout/timeout.html` should be created if not already).
 
-  - [ ] Step 2.8: Unit Tests for `site_blocker.js`
+  - [x] Step 2.8: Unit Tests for `site_blocker.js`
 
       * **Task**: Create `tests/unit/background_scripts/site_blocker.test.js`. Write unit tests for limit checking and redirection. Mock `storage_manager` and `browser.tabs.update`.
       * **Files**:
           * `tests/unit/background_scripts/site_blocker.test.js`: Test cases.
       * **Step Dependencies**: Step 2.7.
 
-  - [ ] Step 2.9: Implement `main.js` - Background Script Orchestration
+  - [x] Step 2.9: Implement `main.js` - Background Script Orchestration
 
       * **Task**: Create `background_scripts/main.js`.
           * Initialize/call main functions from `daily_reset.js`, `time_tracker.js`.
@@ -206,7 +206,7 @@ I will now generate the plan in the requested markdown format.
           * `background_scripts/main.js`: Orchestration and message listeners.
       * **Step Dependencies**: Step 2.1, Step 2.4, Step 2.7.
 
-  - [ ] Step 2.10: Update `manifest.json` for Background Scripts & Permissions
+  - [x] Step 2.10: Update `manifest.json` for Background Scripts & Permissions
 
       * **Task**: Modify `manifest.json` to:
           * Declare `background_scripts/main.js` as the background script (using `{"service_worker": "background_scripts/main.js"}` for Manifest V3, or `{"scripts": ["background_scripts/main.js"]}` for V2).
@@ -217,7 +217,7 @@ I will now generate the plan in the requested markdown format.
 
 ## Phase 3: UI - Timeout Page
 
-  - [ ] Step 3.1: Create Timeout Page HTML Structure (`timeout.html`)
+  - [x] Step 3.1: Create Timeout Page HTML Structure (`timeout.html`)
 
       * **Task**: Create `ui/timeout/timeout.html`. Include placeholders for:
           * A message indicating the time limit has been reached for a specific site.
@@ -227,7 +227,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/timeout/timeout.html`: Basic HTML.
       * **Step Dependencies**: None for HTML structure itself.
 
-  - [ ] Step 3.2: Style Timeout Page (`timeout.css`)
+  - [x] Step 3.2: Style Timeout Page (`timeout.css`)
 
       * **Task**: Create `ui/timeout/timeout.css`. Apply styles for a clean, calm, and modern appearance. Center content, use legible fonts, and ensure good contrast. Also, create `ui/common_assets/css/global.css` and `ui/common_assets/css/variables.css` if they don't exist, for shared styles/variables.
       * **Files**:
@@ -236,7 +236,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/common_assets/css/variables.css`: CSS custom properties for colors, fonts, etc.
       * **Step Dependencies**: Step 3.1.
 
-  - [ ] Step 3.3: Implement Timeout Page JavaScript (`timeout.js`) - Display Logic
+  - [x] Step 3.3: Implement Timeout Page JavaScript (`timeout.js`) - Display Logic
 
       * **Task**: Create `ui/timeout/timeout.js`.
           * On load, parse `blockedUrl` and `siteId` from URL query parameters.
@@ -247,7 +247,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/timeout/timeout.js`: JavaScript logic.
       * **Step Dependencies**: Step 3.1, Step 1.1 (for `getTimeoutNotes` in background), Step 2.9 (for background message listener).
 
-  - [ ] Step 3.4: Add Timeout Page to `manifest.json` as Web Accessible Resource
+  - [x] Step 3.4: Add Timeout Page to `manifest.json` as Web Accessible Resource
 
       * **Task**: Modify `manifest.json` to include `ui/timeout/timeout.html` in `web_accessible_resources` so it can be loaded by `browser.tabs.update`.
       * **Files**:
@@ -256,7 +256,7 @@ I will now generate the plan in the requested markdown format.
 
 ## Phase 4: UI - Settings Page (Options UI)
 
-  - [ ] Step 4.1: Create Settings Page HTML Structure (`settings.html`) & Manifest Entry
+  - [x] Step 4.1: Create Settings Page HTML Structure (`settings.html`) & Manifest Entry
 
       * **Task**: Create `ui/settings/settings.html`.
           * Structure for two main sections: "Manage Distracting Sites" and "Manage Timeout Notes".
@@ -269,7 +269,7 @@ I will now generate the plan in the requested markdown format.
           * `manifest.json`: Add `options_ui` field.
       * **Step Dependencies**: None for HTML structure itself.
 
-  - [ ] Step 4.2: Style Settings Page (`settings.css`)
+  - [x] Step 4.2: Style Settings Page (`settings.css`)
 
       * **Task**: Create `ui/settings/settings.css`. Apply styles for a clean, intuitive, and modern layout. Style forms, lists, list items, buttons. Ensure it's responsive if it's a full page.
       * **Files**:
@@ -277,7 +277,7 @@ I will now generate the plan in the requested markdown format.
           * (Uses `ui/common_assets/css/global.css` and `variables.css` from Step 3.2).
       * **Step Dependencies**: Step 4.1.
 
-  - [ ] Step 4.3: Implement `settings.js` - Load and Display Initial Data
+  - [x] Step 4.3: Implement `settings.js` - Load and Display Initial Data
 
       * **Task**: Create `ui/settings/settings.js`.
           * On DOMContentLoaded, send a message to `background_scripts/main.js` (action: "getAllSettings") to fetch `distractingSites` and `timeoutNotes`.
@@ -286,7 +286,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/settings/settings.js`: Initial data loading and placeholder rendering.
       * **Step Dependencies**: Step 4.1, Step 1.1 (for `getAllSettings` in background), Step 2.9 (background message listener).
 
-  - [ ] Step 4.4: Implement `SiteListItem` Component and Rendering for Distracting Sites
+  - [x] Step 4.4: Implement `SiteListItem` Component and Rendering for Distracting Sites
 
       * **Task**: In `ui/settings/settings.js` (or a new `ui/settings/components/site_list_item.js` if preferred for modularity):
           * Create a function `createSiteListItem(siteObject)` that generates DOM elements for a single site (displaying URL pattern, daily limit, "Edit" and "Delete" buttons).
@@ -296,7 +296,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/settings/components/site_list_item.js` (Optional, if making a separate file): Component logic.
       * **Step Dependencies**: Step 4.3.
 
-  - [ ] Step 4.5: Implement Add Distracting Site Functionality
+  - [x] Step 4.5: Implement Add Distracting Site Functionality
 
       * **Task**: In `ui/settings/settings.js`:
           * Add event listener to the "Add Site" form.
@@ -307,7 +307,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/settings/settings.js`: Add site form handling and communication.
       * **Step Dependencies**: Step 4.4, Step 1.2 (background `addDistractingSite`).
 
-  - [ ] Step 4.6: Implement Edit/Delete Distracting Site Functionality
+  - [x] Step 4.6: Implement Edit/Delete Distracting Site Functionality
 
       * **Task**: In `ui/settings/settings.js` (using event delegation on the sites list) or within `site_list_item.js` logic:
           * Handle "Delete" button clicks: Confirm deletion, send message to background (action: "deleteDistractingSite", payload: site ID). Refresh list on success.
@@ -317,7 +317,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/settings/components/site_list_item.js` (If used): May contain button event wiring.
       * **Step Dependencies**: Step 4.5, Step 1.2 (background update/delete).
 
-  - [ ] Step 4.7: Implement `NoteListItem` Component and Rendering for Timeout Notes
+  - [x] Step 4.7: Implement `NoteListItem` Component and Rendering for Timeout Notes
 
       * **Task**: Similar to Step 4.4, in `ui/settings/settings.js` (or `ui/settings/components/note_list_item.js`):
           * Create `createNoteListItem(noteObject)` function for a single note (displaying text, "Edit" and "Delete" buttons).
@@ -327,7 +327,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/settings/components/note_list_item.js` (Optional): Component logic.
       * **Step Dependencies**: Step 4.3.
 
-  - [ ] Step 4.8: Implement Add Timeout Note Functionality
+  - [x] Step 4.8: Implement Add Timeout Note Functionality
 
       * **Task**: In `ui/settings/settings.js`:
           * Add event listener to "Add Note" form.
@@ -338,7 +338,7 @@ I will now generate the plan in the requested markdown format.
           * `ui/settings/settings.js`: Add note form handling.
       * **Step Dependencies**: Step 4.7, Step 1.3 (background `addTimeoutNote`).
 
-  - [ ] Step 4.9: Implement Edit/Delete Timeout Note Functionality
+  - [x] Step 4.9: Implement Edit/Delete Timeout Note Functionality
 
       * **Task**: Similar to Step 4.6, for notes:
           * Handle "Delete" button clicks: Confirm, send message (action: "deleteTimeoutNote"). Refresh.
@@ -357,7 +357,7 @@ I will now generate the plan in the requested markdown format.
           * `tests/integration/settings_background_interaction.test.js`: Test cases.
       * **Step Dependencies**: All of Phase 1, Phase 2, Phase 4.
 
-  - [ ] Step 5.2: UI/UX Review and Polish for Settings & Timeout Pages
+  - [x] Step 5.2: UI/UX Review and Polish for Settings & Timeout Pages
 
       * **Task**: Manually review both the Settings and Timeout pages in the browser. Ensure they are visually appealing ("clean, modern, intuitive"), easy to use, and functional. Refine CSS and layout as needed. Check for responsiveness of the Settings page.
       * **Files**:

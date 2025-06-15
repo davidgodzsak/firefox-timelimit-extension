@@ -1,195 +1,344 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-
 /**
  * @file site_storage.test.js
- * @description Unit tests for site_storage.js.
+ * @description Unit tests for site storage module
+ * 
+ * Tests verify that:
+ * - Site CRUD operations work correctly
+ * - Data validation is properly enforced
+ * - Error scenarios are handled gracefully
+ * - Storage interactions are correct
  */
 
-// Mock browser APIs before importing the module under test
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+
+// Mock browser APIs
 const mockStorageArea = {
   get: jest.fn(),
   set: jest.fn(),
 };
+
 global.browser = {
   storage: {
     local: mockStorageArea,
   },
 };
 
-// Mock crypto.randomUUID
-const mockCrypto = {
+// Mock crypto for ID generation
+global.crypto = {
   randomUUID: jest.fn(),
 };
-global.crypto = mockCrypto;
 
-// Import the functions to be tested
-import {
-  getDistractingSites,
-  addDistractingSite,
-  updateDistractingSite,
-  deleteDistractingSite
-} from '../../../background_scripts/site_storage.js';
-
-describe('site_storage.js', () => {
+describe('Site Storage Module', () => {
   let mockLocalStorageData;
   let consoleErrorSpy;
-  let consoleWarnSpy;
+  let uuidCounter;
+  let siteStorage;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Reset mock data
     mockLocalStorageData = {};
+    uuidCounter = 0;
 
+    // Setup storage mocks
     mockStorageArea.get.mockImplementation(async (key) => {
       const result = {};
-      if (key === 'distractingSites' && mockLocalStorageData.distractingSites) {
-        result.distractingSites = mockLocalStorageData.distractingSites;
+      if (mockLocalStorageData[key] !== undefined) {
+        result[key] = mockLocalStorageData[key];
       }
       return Promise.resolve(result);
     });
 
     mockStorageArea.set.mockImplementation(async (items) => {
-      if (items.hasOwnProperty('distractingSites')) {
-        mockLocalStorageData.distractingSites = items.distractingSites;
-      }
+      Object.assign(mockLocalStorageData, items);
       return Promise.resolve();
     });
 
-    let uuidCounter = 0;
-    mockCrypto.randomUUID.mockImplementation(() => `test-uuid-${++uuidCounter}`);
+    // Setup UUID generation
+    global.crypto.randomUUID.mockImplementation(() => `test-uuid-${++uuidCounter}`);
 
+    // Setup console spy
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    mockStorageArea.get.mockClear();
-    mockStorageArea.set.mockClear();
-    mockCrypto.randomUUID.mockClear();
-    consoleErrorSpy.mockClear();
-    consoleWarnSpy.mockClear();
+    // Import the module fresh
+    jest.resetModules();
+    siteStorage = await import('../../../background_scripts/site_storage.js');
+
+    // Clear all mocks
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
   });
 
   describe('getDistractingSites', () => {
-    it('should return an empty array if no sites are stored', async () => {
-      const sites = await getDistractingSites();
+    it('should return empty array when no sites exist', async () => {
+      const sites = await siteStorage.getDistractingSites();
       expect(sites).toEqual([]);
+      expect(mockStorageArea.get).toHaveBeenCalledWith('distractingSites');
     });
 
-    it('should return stored distracting sites', async () => {
-      const storedSites = [{ id: '1', urlPattern: 'example.com' }];
-      mockLocalStorageData.distractingSites = storedSites;
-      const sites = await getDistractingSites();
-      expect(sites).toEqual(storedSites);
+    it('should return existing sites', async () => {
+      const testSites = [
+        { id: 'site1', urlPattern: 'facebook.com', dailyLimitSeconds: 3600, isEnabled: true },
+        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+      ];
+      mockLocalStorageData.distractingSites = testSites;
+
+      const sites = await siteStorage.getDistractingSites();
+      expect(sites).toEqual(testSites);
     });
 
-    it('should return an empty array on storage error and log error', async () => {
-      mockStorageArea.get.mockRejectedValueOnce(new Error('Storage failed'));
-      const sites = await getDistractingSites();
+    it('should handle storage errors gracefully', async () => {
+      mockStorageArea.get.mockRejectedValue(new Error('Storage error'));
+
+      const sites = await siteStorage.getDistractingSites();
       expect(sites).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error getting distracting sites:", expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Error getting distracting sites:', expect.any(Error));
     });
   });
 
   describe('addDistractingSite', () => {
-    it('should add a new site with a generated ID and default isEnabled', async () => {
-      const siteObject = { urlPattern: 'news.com', dailyLimitSeconds: 3600 };
-      const addedSite = await addDistractingSite(siteObject);
-      expect(addedSite).toEqual({
-        id: 'test-uuid-1',
-        urlPattern: 'news.com',
+    it('should add a valid site successfully', async () => {
+      const siteData = {
+        urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
-        isEnabled: true,
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(siteData);
+
+      expect(result).toEqual({
+        id: 'test-uuid-1',
+        ...siteData
       });
-      expect(mockLocalStorageData.distractingSites).toEqual([addedSite]);
+      expect(mockLocalStorageData.distractingSites).toEqual([{
+        id: 'test-uuid-1',
+        ...siteData
+      }]);
     });
 
-     it('should add a new site with isEnabled set to false', async () => {
-        const siteObject = { urlPattern: 'social.com', dailyLimitSeconds: 1800, isEnabled: false };
-        const addedSite = await addDistractingSite(siteObject);
-        expect(addedSite.isEnabled).toBe(false);
-    });
+    it('should validate required fields', async () => {
+      const invalidSiteData = {
+        dailyLimitSeconds: 3600,
+        isEnabled: true
+        // Missing urlPattern
+      };
 
-    it('should return null and log error for invalid siteObject', async () => {
-      const siteObject = { dailyLimitSeconds: 3600 };
-      const result = await addDistractingSite(siteObject);
+      const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Invalid site data:', expect.any(String));
     });
 
-    it('should trim urlPattern', async () => {
-        const siteObject = { urlPattern: '  trimmed.com  ', dailyLimitSeconds: 60 };
-        const addedSite = await addDistractingSite(siteObject);
-        expect(addedSite.urlPattern).toBe('trimmed.com');
-    });
+    it('should validate urlPattern format', async () => {
+      const invalidSiteData = {
+        urlPattern: '', // Empty string
+        dailyLimitSeconds: 3600,
+        isEnabled: true
+      };
 
-    it('should return null on storage set error and log error', async () => {
-      mockStorageArea.set.mockRejectedValueOnce(new Error('Set failed'));
-      const siteObject = { urlPattern: 'fail.com', dailyLimitSeconds: 3600 };
-      const result = await addDistractingSite(siteObject);
+      const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error adding distracting site:", expect.any(Error));
+    });
+
+    it('should validate dailyLimitSeconds is positive', async () => {
+      const invalidSiteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: -100, // Negative
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(invalidSiteData);
+      expect(result).toBeNull();
+    });
+
+    it('should handle storage errors', async () => {
+      mockStorageArea.set.mockRejectedValue(new Error('Storage write failed'));
+
+      const siteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(siteData);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Error adding site:', expect.any(Error));
+    });
+
+    it('should prevent duplicate URL patterns', async () => {
+      // Add first site
+      const siteData1 = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        isEnabled: true
+      };
+      await siteStorage.addDistractingSite(siteData1);
+
+      // Try to add duplicate
+      const siteData2 = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 1800,
+        isEnabled: false
+      };
+
+      const result = await siteStorage.addDistractingSite(siteData2);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Invalid site data:', expect.stringContaining('already exists'));
     });
   });
 
   describe('updateDistractingSite', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+      // Setup existing sites
       mockLocalStorageData.distractingSites = [
-        { id: 'test-uuid-1', urlPattern: 'site1.com', dailyLimitSeconds: 100, isEnabled: true },
+        { id: 'site1', urlPattern: 'facebook.com', dailyLimitSeconds: 3600, isEnabled: true },
+        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
       ];
     });
 
-    it('should update an existing site', async () => {
-      const updates = { dailyLimitSeconds: 150, isEnabled: false };
-      const updatedSite = await updateDistractingSite('test-uuid-1', updates);
-      expect(updatedSite).toEqual({
-        id: 'test-uuid-1',
-        urlPattern: 'site1.com',
-        dailyLimitSeconds: 150,
-        isEnabled: false,
+    it('should update existing site successfully', async () => {
+      const updates = {
+        dailyLimitSeconds: 7200,
+        isEnabled: false
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', updates);
+
+      expect(result).toEqual({
+        id: 'site1',
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 7200,
+        isEnabled: false
       });
+      expect(mockLocalStorageData.distractingSites[0]).toEqual(result);
     });
 
-    it('should return null if siteId is not found and log warn', async () => {
-      const result = await updateDistractingSite('non-existent-id', { dailyLimitSeconds: 100 });
+    it('should return null for non-existent site', async () => {
+      const updates = { dailyLimitSeconds: 7200 };
+
+      const result = await siteStorage.updateDistractingSite('non-existent', updates);
       expect(result).toBeNull();
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Site with ID "non-existent-id" not found for update.');
     });
 
-    it('should return null on storage set error and log error', async () => {
-      mockStorageArea.set.mockRejectedValueOnce(new Error('Set failed'));
-      const result = await updateDistractingSite('test-uuid-1', { dailyLimitSeconds: 50 });
+    it('should validate updated fields', async () => {
+      const invalidUpdates = {
+        dailyLimitSeconds: -100 // Negative
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating distracting site with ID "test-uuid-1":', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Invalid update data:', expect.any(String));
+    });
+
+    it('should prevent updating to duplicate URL pattern', async () => {
+      const updates = {
+        urlPattern: 'youtube.com' // Already exists for site2
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', updates);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Invalid update data:', expect.stringContaining('already exists'));
+    });
+
+    it('should handle storage errors', async () => {
+      mockStorageArea.set.mockRejectedValue(new Error('Storage write failed'));
+
+      const updates = { dailyLimitSeconds: 7200 };
+
+      const result = await siteStorage.updateDistractingSite('site1', updates);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Error updating site:', expect.any(Error));
     });
   });
 
   describe('deleteDistractingSite', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+      // Setup existing sites
       mockLocalStorageData.distractingSites = [
-        { id: 'test-uuid-1', urlPattern: 'site1.com' },
-        { id: 'test-uuid-2', urlPattern: 'site2.com' },
+        { id: 'site1', urlPattern: 'facebook.com', dailyLimitSeconds: 3600, isEnabled: true },
+        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
       ];
     });
 
-    it('should delete an existing site and return true', async () => {
-      const result = await deleteDistractingSite('test-uuid-1');
+    it('should delete existing site successfully', async () => {
+      const result = await siteStorage.deleteDistractingSite('site1');
+
       expect(result).toBe(true);
-      expect(mockLocalStorageData.distractingSites).toEqual([{ id: 'test-uuid-2', urlPattern: 'site2.com' }]);
+      expect(mockLocalStorageData.distractingSites).toEqual([
+        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+      ]);
     });
 
-    it('should return false if siteId is not found and log warn', async () => {
-      const result = await deleteDistractingSite('non-existent-id');
+    it('should return false for non-existent site', async () => {
+      const result = await siteStorage.deleteDistractingSite('non-existent');
       expect(result).toBe(false);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Site with ID "non-existent-id" not found for deletion.');
+      expect(mockLocalStorageData.distractingSites).toHaveLength(2); // Unchanged
     });
 
-    it('should return false on storage set error and log error', async () => {
-      mockStorageArea.set.mockRejectedValueOnce(new Error('Set failed'));
-      const result = await deleteDistractingSite('test-uuid-1');
+    it('should handle storage errors', async () => {
+      mockStorageArea.set.mockRejectedValue(new Error('Storage write failed'));
+
+      const result = await siteStorage.deleteDistractingSite('site1');
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting distracting site with ID "test-uuid-1":', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[SiteStorage] Error deleting site:', expect.any(Error));
+    });
+  });
+
+  describe('edge cases and data integrity', () => {
+    it('should handle corrupted storage data gracefully', async () => {
+      // Set invalid data in storage
+      mockLocalStorageData.distractingSites = 'invalid data';
+
+      const sites = await siteStorage.getDistractingSites();
+      expect(sites).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    it('should handle partial site objects in storage', async () => {
+      // Set incomplete site objects
+      mockLocalStorageData.distractingSites = [
+        { id: 'site1', urlPattern: 'facebook.com' }, // Missing required fields
+        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+      ];
+
+      const sites = await siteStorage.getDistractingSites();
+      // Should filter out invalid entries or handle gracefully
+      expect(Array.isArray(sites)).toBe(true);
+    });
+
+    it('should maintain data consistency after multiple operations', async () => {
+      // Add multiple sites
+      const site1 = await siteStorage.addDistractingSite({
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        isEnabled: true
+      });
+
+      const site2 = await siteStorage.addDistractingSite({
+        urlPattern: 'youtube.com',
+        dailyLimitSeconds: 1800,
+        isEnabled: false
+      });
+
+      expect(site1).toBeTruthy();
+      expect(site2).toBeTruthy();
+
+      // Update one
+      const updatedSite1 = await siteStorage.updateDistractingSite(site1.id, {
+        dailyLimitSeconds: 7200
+      });
+      expect(updatedSite1.dailyLimitSeconds).toBe(7200);
+
+      // Delete the other
+      const deleteResult = await siteStorage.deleteDistractingSite(site2.id);
+      expect(deleteResult).toBe(true);
+
+      // Verify final state
+      const finalSites = await siteStorage.getDistractingSites();
+      expect(finalSites).toHaveLength(1);
+      expect(finalSites[0].id).toBe(site1.id);
+      expect(finalSites[0].dailyLimitSeconds).toBe(7200);
     });
   });
 }); 
