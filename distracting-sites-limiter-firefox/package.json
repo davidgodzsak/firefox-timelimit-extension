@@ -1,5 +1,5 @@
 {
-  "name": "firefox-distraction-limiter",
+  "name": "distraction-limiter",
   "version": "1.0.0",
   "description":  "Helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached. Features customizable time limits, motivational timeout notes, and clean modern UI.",
   "main": "./background_scripts/main.js",
@@ -12,7 +12,7 @@
     "prebuild": "yarn lint && yarn test",
     "clean": "rm -rf dist/ *.zip",
     "package": "yarn clean && yarn prebuild && yarn build",
-    "verify-package": "unzip -l firefox-distraction-limiter-v*.zip"
+    "verify-package": "unzip -l timelimit-extension-v*.zip"
   },
   "jest": {
     "setupFiles": [

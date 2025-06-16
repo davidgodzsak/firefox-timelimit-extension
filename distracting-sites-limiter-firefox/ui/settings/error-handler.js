@@ -20,6 +20,22 @@ window.addEventListener('error', function(e) {
             z-index: 10000;
         `;
         
+        // Create heading
+        const heading = document.createElement('h2');
+        heading.style.cssText = 'color: #dc2626; margin: 0 0 1rem 0;';
+        heading.textContent = 'Settings Failed to Load';
+        
+        // Create description paragraph
+        const description = document.createElement('p');
+        description.style.cssText = 'margin: 0 0 1rem 0;';
+        description.textContent = 'There was an error loading the settings page.';
+        
+        // Create error details paragraph
+        const errorDetails = document.createElement('p');
+        errorDetails.style.cssText = 'margin: 0 0 1rem 0; font-family: monospace; font-size: 0.875rem; color: #666;';
+        errorDetails.textContent = e.error ? e.error.message : 'Unknown error';
+        
+        // Create refresh button
         const refreshButton = document.createElement('button');
         refreshButton.textContent = 'Refresh Page';
         refreshButton.style.cssText = `
@@ -32,15 +48,12 @@ window.addEventListener('error', function(e) {
         `;
         refreshButton.addEventListener('click', () => location.reload());
         
-        errorDiv.innerHTML = `
-            <h2 style="color: #dc2626; margin: 0 0 1rem 0;">Settings Failed to Load</h2>
-            <p style="margin: 0 0 1rem 0;">There was an error loading the settings page.</p>
-            <p style="margin: 0 0 1rem 0; font-family: monospace; font-size: 0.875rem; color: #666;">
-                ${e.error ? e.error.message : 'Unknown error'}
-            </p>
-        `;
-        
+        // Assemble the error div
+        errorDiv.appendChild(heading);
+        errorDiv.appendChild(description);
+        errorDiv.appendChild(errorDetails);
         errorDiv.appendChild(refreshButton);
+        
         document.body.appendChild(errorDiv);
     }
 });

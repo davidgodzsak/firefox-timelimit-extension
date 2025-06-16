@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Firefox Distraction Limiter",
+  "id": "distraction-limiter@davidgodzsak.dev",
+  "name": "Distraction Limiter",
   "version": "1.0.0",
   "description": "Helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached. Features customizable time limits, motivational timeout notes, and clean modern UI.",
   "author": "Dávid Godzsák",
@@ -12,7 +13,9 @@
     "128": "assets/icons/icon-128.png"
   },
   "background": {
-    "scripts": ["background_scripts/main.js"],
+    "scripts": [
+      "background_scripts/main.js"
+    ],
     "type": "module"
   },
   "permissions": [
@@ -23,18 +26,27 @@
   ],
   "options_ui": {
     "page": "ui/settings/settings.html",
-    "browser_style": true,
     "open_in_tab": true
   },
-  "web_accessible_resources": [{
-    "resources": [
-      "ui/timeout/timeout.html",
-      "ui/timeout/timeout.css",
-      "ui/timeout/timeout.js",
-      "ui/common_assets/css/variables.css",
-      "ui/common_assets/css/global.css"
-    ],
-    "matches": ["<all_urls>"]
-  }],
-  "default_locale": "en"
-} 
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "ui/timeout/timeout.html",
+        "ui/timeout/timeout.css",
+        "ui/timeout/timeout.js",
+        "ui/common_assets/css/variables.css",
+        "ui/common_assets/css/global.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "default_locale": "en",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "distraction-limiter@davidgodzsak.dev",
+      "strict_min_version": "112.0"
+    }
+  }
+}

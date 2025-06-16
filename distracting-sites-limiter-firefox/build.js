@@ -107,7 +107,7 @@ async function build() {
     }
 
     // Create zip file
-    const zipName = `firefox-distraction-limiter-v${version}.zip`;
+    const zipName = `timelimit-extension-v${version}.zip`;
     const zipPath = path.join(__dirname, zipName);
     
     if (fs.existsSync(zipPath)) {

@@ -598,35 +598,86 @@ class SettingsManager {
         item.className = 'item-card';
         item.role = 'listitem';
         
-        item.innerHTML = `
-            <div class="item-content">
-                <div class="item-info">
-                    <div class="item-title">${this.escapeHtml(site.urlPattern)}</div>
-                    <div class="item-subtitle">${timeInMinutes} minute${timeInMinutes !== 1 ? 's' : ''} daily limit</div>
-                </div>
-                <div class="item-actions">
-                    <button class="btn btn-secondary btn-small edit-site-btn" data-site-id="${site.id}" aria-label="Edit ${site.urlPattern}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                        Edit
-                    </button>
-                    <button class="btn btn-danger btn-small delete-site-btn" data-site-id="${site.id}" aria-label="Delete ${site.urlPattern}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3,6 5,6 21,6"/>
-                            <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"/>
-                        </svg>
-                        Delete
-                    </button>
-                </div>
-            </div>
-        `;
+        // Create elements securely instead of using innerHTML
+        const content = document.createElement('div');
+        content.className = 'item-content';
+        
+        const info = document.createElement('div');
+        info.className = 'item-info';
+        
+        const title = document.createElement('div');
+        title.className = 'item-title';
+        title.textContent = site.urlPattern;
+        
+        const subtitle = document.createElement('div');
+        subtitle.className = 'item-subtitle';
+        subtitle.textContent = `${timeInMinutes} minute${timeInMinutes !== 1 ? 's' : ''} daily limit`;
+        
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+        
+        // Create edit button
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-secondary btn-small edit-site-btn';
+        editBtn.setAttribute('data-site-id', site.id);
+        editBtn.setAttribute('aria-label', `Edit ${site.urlPattern}`);
+        
+        const editSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        editSvg.setAttribute('width', '14');
+        editSvg.setAttribute('height', '14');
+        editSvg.setAttribute('viewBox', '0 0 24 24');
+        editSvg.setAttribute('fill', 'none');
+        editSvg.setAttribute('stroke', 'currentColor');
+        editSvg.setAttribute('stroke-width', '2');
+        editSvg.setAttribute('stroke-linecap', 'round');
+        editSvg.setAttribute('stroke-linejoin', 'round');
+        
+        const editPath1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        editPath1.setAttribute('d', 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7');
+        const editPath2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        editPath2.setAttribute('d', 'm18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z');
+        
+        editSvg.appendChild(editPath1);
+        editSvg.appendChild(editPath2);
+        editBtn.appendChild(editSvg);
+        editBtn.appendChild(document.createTextNode(' Edit'));
+        
+        // Create delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-danger btn-small delete-site-btn';
+        deleteBtn.setAttribute('data-site-id', site.id);
+        deleteBtn.setAttribute('aria-label', `Delete ${site.urlPattern}`);
+        
+        const deleteSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        deleteSvg.setAttribute('width', '14');
+        deleteSvg.setAttribute('height', '14');
+        deleteSvg.setAttribute('viewBox', '0 0 24 24');
+        deleteSvg.setAttribute('fill', 'none');
+        deleteSvg.setAttribute('stroke', 'currentColor');
+        deleteSvg.setAttribute('stroke-width', '2');
+        deleteSvg.setAttribute('stroke-linecap', 'round');
+        deleteSvg.setAttribute('stroke-linejoin', 'round');
+        
+        const deletePolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        deletePolyline.setAttribute('points', '3,6 5,6 21,6');
+        const deletePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        deletePath.setAttribute('d', 'm19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2');
+        
+        deleteSvg.appendChild(deletePolyline);
+        deleteSvg.appendChild(deletePath);
+        deleteBtn.appendChild(deleteSvg);
+        deleteBtn.appendChild(document.createTextNode(' Delete'));
+        
+        // Assemble the structure
+        info.appendChild(title);
+        info.appendChild(subtitle);
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+        content.appendChild(info);
+        content.appendChild(actions);
+        item.appendChild(content);
         
         // Bind event listeners
-        const editBtn = item.querySelector('.edit-site-btn');
-        const deleteBtn = item.querySelector('.delete-site-btn');
-        
         editBtn.addEventListener('click', () => this.promptEditSite(site));
         deleteBtn.addEventListener('click', () => this.handleDeleteSite(site.id));
         
@@ -641,34 +692,81 @@ class SettingsManager {
         item.className = 'item-card';
         item.role = 'listitem';
         
-        item.innerHTML = `
-            <div class="item-content">
-                <div class="item-info">
-                    <div class="item-title">${this.escapeHtml(note.text)}</div>
-                </div>
-                <div class="item-actions">
-                    <button class="btn btn-secondary btn-small edit-note-btn" data-note-id="${note.id}" aria-label="Edit note">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                        Edit
-                    </button>
-                    <button class="btn btn-danger btn-small delete-note-btn" data-note-id="${note.id}" aria-label="Delete note">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3,6 5,6 21,6"/>
-                            <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"/>
-                        </svg>
-                        Delete
-                    </button>
-                </div>
-            </div>
-        `;
+        // Create elements securely instead of using innerHTML
+        const content = document.createElement('div');
+        content.className = 'item-content';
+        
+        const info = document.createElement('div');
+        info.className = 'item-info';
+        
+        const title = document.createElement('div');
+        title.className = 'item-title';
+        title.textContent = note.text;
+        
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+        
+        // Create edit button
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-secondary btn-small edit-note-btn';
+        editBtn.setAttribute('data-note-id', note.id);
+        editBtn.setAttribute('aria-label', 'Edit note');
+        
+        const editSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        editSvg.setAttribute('width', '14');
+        editSvg.setAttribute('height', '14');
+        editSvg.setAttribute('viewBox', '0 0 24 24');
+        editSvg.setAttribute('fill', 'none');
+        editSvg.setAttribute('stroke', 'currentColor');
+        editSvg.setAttribute('stroke-width', '2');
+        editSvg.setAttribute('stroke-linecap', 'round');
+        editSvg.setAttribute('stroke-linejoin', 'round');
+        
+        const editPath1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        editPath1.setAttribute('d', 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7');
+        const editPath2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        editPath2.setAttribute('d', 'm18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z');
+        
+        editSvg.appendChild(editPath1);
+        editSvg.appendChild(editPath2);
+        editBtn.appendChild(editSvg);
+        editBtn.appendChild(document.createTextNode(' Edit'));
+        
+        // Create delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-danger btn-small delete-note-btn';
+        deleteBtn.setAttribute('data-note-id', note.id);
+        deleteBtn.setAttribute('aria-label', 'Delete note');
+        
+        const deleteSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        deleteSvg.setAttribute('width', '14');
+        deleteSvg.setAttribute('height', '14');
+        deleteSvg.setAttribute('viewBox', '0 0 24 24');
+        deleteSvg.setAttribute('fill', 'none');
+        deleteSvg.setAttribute('stroke', 'currentColor');
+        deleteSvg.setAttribute('stroke-width', '2');
+        deleteSvg.setAttribute('stroke-linecap', 'round');
+        deleteSvg.setAttribute('stroke-linejoin', 'round');
+        
+        const deletePolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        deletePolyline.setAttribute('points', '3,6 5,6 21,6');
+        const deletePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        deletePath.setAttribute('d', 'm19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2');
+        
+        deleteSvg.appendChild(deletePolyline);
+        deleteSvg.appendChild(deletePath);
+        deleteBtn.appendChild(deleteSvg);
+        deleteBtn.appendChild(document.createTextNode(' Delete'));
+        
+        // Assemble the structure
+        info.appendChild(title);
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+        content.appendChild(info);
+        content.appendChild(actions);
+        item.appendChild(content);
         
         // Bind event listeners
-        const editBtn = item.querySelector('.edit-note-btn');
-        const deleteBtn = item.querySelector('.delete-note-btn');
-        
         editBtn.addEventListener('click', () => this.promptEditNote(note));
         deleteBtn.addEventListener('click', () => this.handleDeleteNote(note.id));
         
@@ -736,26 +834,129 @@ class SettingsManager {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         
-        const icons = {
-            success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>',
-            error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-            warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21,16-10-17L1,16z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-            info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
-        };
+        // Create toast icon container
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'toast-icon';
         
-        toast.innerHTML = `
-            <div class="toast-icon">${icons[type]}</div>
-            <p class="toast-message">${this.escapeHtml(message)}</p>
-            <button class="toast-close" aria-label="Close notification">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        `;
+        // Create SVG icons securely
+        const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        iconSvg.setAttribute('width', '16');
+        iconSvg.setAttribute('height', '16');
+        iconSvg.setAttribute('viewBox', '0 0 24 24');
+        iconSvg.setAttribute('fill', 'none');
+        iconSvg.setAttribute('stroke', 'currentColor');
+        iconSvg.setAttribute('stroke-width', '2');
+        
+        // Add icon based on type
+        switch (type) {
+            case 'success': {
+                const successPolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                successPolyline.setAttribute('points', '20,6 9,17 4,12');
+                iconSvg.appendChild(successPolyline);
+                break;
+            }
+            case 'error': {
+                const errorCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                errorCircle.setAttribute('cx', '12');
+                errorCircle.setAttribute('cy', '12');
+                errorCircle.setAttribute('r', '10');
+                const errorLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                errorLine1.setAttribute('x1', '15');
+                errorLine1.setAttribute('y1', '9');
+                errorLine1.setAttribute('x2', '9');
+                errorLine1.setAttribute('y2', '15');
+                const errorLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                errorLine2.setAttribute('x1', '9');
+                errorLine2.setAttribute('y1', '9');
+                errorLine2.setAttribute('x2', '15');
+                errorLine2.setAttribute('y2', '15');
+                iconSvg.appendChild(errorCircle);
+                iconSvg.appendChild(errorLine1);
+                iconSvg.appendChild(errorLine2);
+                break;
+            }
+            case 'warning': {
+                const warningPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                warningPath.setAttribute('d', 'm21,16-10-17L1,16z');
+                const warningLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                warningLine1.setAttribute('x1', '12');
+                warningLine1.setAttribute('y1', '9');
+                warningLine1.setAttribute('x2', '12');
+                warningLine1.setAttribute('y2', '13');
+                const warningLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                warningLine2.setAttribute('x1', '12');
+                warningLine2.setAttribute('y1', '17');
+                warningLine2.setAttribute('x2', '12.01');
+                warningLine2.setAttribute('y2', '17');
+                iconSvg.appendChild(warningPath);
+                iconSvg.appendChild(warningLine1);
+                iconSvg.appendChild(warningLine2);
+                break;
+            }
+            case 'info':
+            default: {
+                const infoCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                infoCircle.setAttribute('cx', '12');
+                infoCircle.setAttribute('cy', '12');
+                infoCircle.setAttribute('r', '10');
+                const infoLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                infoLine1.setAttribute('x1', '12');
+                infoLine1.setAttribute('y1', '16');
+                infoLine1.setAttribute('x2', '12');
+                infoLine1.setAttribute('y2', '12');
+                const infoLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                infoLine2.setAttribute('x1', '12');
+                infoLine2.setAttribute('y1', '8');
+                infoLine2.setAttribute('x2', '12.01');
+                infoLine2.setAttribute('y2', '8');
+                iconSvg.appendChild(infoCircle);
+                iconSvg.appendChild(infoLine1);
+                iconSvg.appendChild(infoLine2);
+                break;
+            }
+        }
+        
+        iconDiv.appendChild(iconSvg);
+        
+        // Create message paragraph
+        const messageParagraph = document.createElement('p');
+        messageParagraph.className = 'toast-message';
+        messageParagraph.textContent = message;
+        
+        // Create close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'toast-close';
+        closeBtn.setAttribute('aria-label', 'Close notification');
+        
+        const closeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        closeSvg.setAttribute('width', '14');
+        closeSvg.setAttribute('height', '14');
+        closeSvg.setAttribute('viewBox', '0 0 24 24');
+        closeSvg.setAttribute('fill', 'none');
+        closeSvg.setAttribute('stroke', 'currentColor');
+        closeSvg.setAttribute('stroke-width', '2');
+        
+        const closeLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        closeLine1.setAttribute('x1', '18');
+        closeLine1.setAttribute('y1', '6');
+        closeLine1.setAttribute('x2', '6');
+        closeLine1.setAttribute('y2', '18');
+        const closeLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        closeLine2.setAttribute('x1', '6');
+        closeLine2.setAttribute('y1', '6');
+        closeLine2.setAttribute('x2', '18');
+        closeLine2.setAttribute('y2', '18');
+        
+        closeSvg.appendChild(closeLine1);
+        closeSvg.appendChild(closeLine2);
+        closeBtn.appendChild(closeSvg);
+        
+        // Assemble the toast
+        toast.appendChild(iconDiv);
+        toast.appendChild(messageParagraph);
+        toast.appendChild(closeBtn);
         
         // Add close handler
-        const closeBtn = toast.querySelector('.toast-close');
         closeBtn.addEventListener('click', () => toast.remove());
         
         // Auto-remove after 5 seconds
