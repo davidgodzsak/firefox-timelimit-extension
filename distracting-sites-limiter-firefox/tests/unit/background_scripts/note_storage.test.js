@@ -44,7 +44,7 @@ describe('note_storage.js', () => {
       });
   
       mockStorageArea.set.mockImplementation(async (items) => {
-        if (items.hasOwnProperty('timeoutNotes')) {
+        if (Object.prototype.hasOwnProperty.call(items, 'timeoutNotes')) {
           mockLocalStorageData.timeoutNotes = items.timeoutNotes;
         }
         return Promise.resolve();

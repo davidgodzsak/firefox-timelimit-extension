@@ -17,7 +17,13 @@ export default defineConfig([
   {
     // Main source files
     files: ["**/*.js"],
-    ignores: ["tests/**/*.js", "coverage/**/*.js"],
+    ignores: [
+      "tests/**/*.js", 
+      "coverage/**/*.js", 
+      "dist/**/*.js", 
+      "build.js",
+      "node_modules/**/*.js"
+    ],
     extends: compat.extends("eslint:recommended"),
     languageOptions: {
         globals: {
@@ -47,10 +53,5 @@ export default defineConfig([
         "no-prototype-builtins": "error",
         "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     }
-  },
-  {
-    // Coverage files - ignore
-    files: ["coverage/**/*.js"],
-    ignores: ["coverage/**/*.js"]
   }
 ]);

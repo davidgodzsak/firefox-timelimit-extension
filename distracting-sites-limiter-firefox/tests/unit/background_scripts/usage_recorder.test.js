@@ -5,34 +5,28 @@
 
 import { jest } from '@jest/globals';
 
-// Since usage_recorder imports from usage_storage, let's mock those functions globally
-// This approach works with the current Jest setup
-global.getUsageStats = jest.fn();
-global.updateUsageStats = jest.fn();
+// Mock the usage_storage module
+jest.unstable_mockModule('../../../background_scripts/usage_storage.js', () => ({
+  getUsageStats: jest.fn(),
+  updateUsageStats: jest.fn(),
+}));
+
+// Import the mocked functions
+const { getUsageStats, updateUsageStats } = await import('../../../background_scripts/usage_storage.js');
+
+// Import the module under test after mocking its dependencies
+const { initializeUsageRecorder, startTrackingSiteTime, stopTrackingSiteTime, recordSiteOpen } = await import('../../../background_scripts/usage_recorder.js');
 
 describe('UsageRecorder', () => {
   let mockIntervalId;
   let mockIntervalCallback;
   let currentTime;
 
-  // Import after globals are set
-  let initializeUsageRecorder, startTrackingSiteTime, stopTrackingSiteTime, recordSiteOpen;
-
-  beforeAll(async () => {
-    // Now we'll try to patch the usage_recorder module to use our global mocks
-    // We need to do this before importing
-    const module = await import('../../../background_scripts/usage_recorder.js');
-    initializeUsageRecorder = module.initializeUsageRecorder;
-    startTrackingSiteTime = module.startTrackingSiteTime;
-    stopTrackingSiteTime = module.stopTrackingSiteTime;
-    recordSiteOpen = module.recordSiteOpen;
-  });
-
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    global.getUsageStats.mockClear();
-    global.updateUsageStats.mockClear();
+    getUsageStats.mockClear();
+    updateUsageStats.mockClear();
     jest.useFakeTimers();
 
     // Set up time mocking
@@ -40,8 +34,8 @@ describe('UsageRecorder', () => {
     global.Date.now = jest.fn(() => currentTime);
 
     // Default mock implementations
-    global.getUsageStats.mockResolvedValue({});
-    global.updateUsageStats.mockResolvedValue(true);
+    getUsageStats.mockResolvedValue({});
+    updateUsageStats.mockResolvedValue(true);
 
     // Mock setInterval to capture the callback
     mockIntervalId = 123; // Arbitrary ID
@@ -75,7 +69,7 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -102,7 +96,7 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -110,7 +104,7 @@ describe('UsageRecorder', () => {
           opens: 0,
         })
       );
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site2',
         expect.objectContaining({
@@ -127,7 +121,7 @@ describe('UsageRecorder', () => {
       currentTime += 3000;
       await stopTrackingSiteTime();
 
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -148,8 +142,8 @@ describe('UsageRecorder', () => {
         }
       }
 
-      expect(global.updateUsageStats).toHaveBeenCalledTimes(3);
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledTimes(3);
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -168,7 +162,7 @@ describe('UsageRecorder', () => {
         await mockIntervalCallback();
       }
 
-      expect(global.updateUsageStats).not.toHaveBeenCalled();
+      expect(updateUsageStats).not.toHaveBeenCalled();
     });
   });
 
@@ -176,7 +170,7 @@ describe('UsageRecorder', () => {
     it('should record a site open without time spent', async () => {
       await recordSiteOpen('site1');
 
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -189,11 +183,11 @@ describe('UsageRecorder', () => {
     it('should not record open with invalid site ID', async () => {
       await recordSiteOpen(null);
 
-      expect(global.updateUsageStats).not.toHaveBeenCalled();
+      expect(updateUsageStats).not.toHaveBeenCalled();
     });
 
     it('should handle storage errors gracefully', async () => {
-      global.updateUsageStats.mockRejectedValue(new Error('Storage error'));
+      updateUsageStats.mockRejectedValue(new Error('Storage error'));
 
       // Should not throw
       await expect(recordSiteOpen('site1')).resolves.not.toThrow();
@@ -203,8 +197,8 @@ describe('UsageRecorder', () => {
   describe('error handling', () => {
     it('should handle storage read errors gracefully', async () => {
       // Set up storage read error
-      global.getUsageStats.mockRejectedValue(new Error('Storage read error'));
-      global.updateUsageStats.mockResolvedValue(true); // Make sure updates still work
+      getUsageStats.mockRejectedValue(new Error('Storage read error'));
+      updateUsageStats.mockResolvedValue(true); // Make sure updates still work
 
       await startTrackingSiteTime('site1');
       
@@ -215,7 +209,7 @@ describe('UsageRecorder', () => {
       }
 
       // Should still try to update with new stats
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
         'site1',
         expect.objectContaining({
@@ -226,7 +220,7 @@ describe('UsageRecorder', () => {
     });
 
     it('should handle storage write errors gracefully', async () => {
-      global.updateUsageStats.mockRejectedValue(new Error('Storage write error'));
+      updateUsageStats.mockRejectedValue(new Error('Storage write error'));
 
       await startTrackingSiteTime('site1');
       
@@ -237,7 +231,7 @@ describe('UsageRecorder', () => {
       }
 
       // Should still try to call updateUsageStats even if it fails
-      expect(global.updateUsageStats).toHaveBeenCalled();
+      expect(updateUsageStats).toHaveBeenCalled();
     });
   });
 
@@ -267,7 +261,7 @@ describe('UsageRecorder', () => {
 
       await recordSiteOpen('site1');
 
-      expect(global.updateUsageStats).toHaveBeenCalledWith(
+      expect(updateUsageStats).toHaveBeenCalledWith(
         '2024-03-14',
         'site1',
         expect.any(Object)
@@ -278,7 +272,7 @@ describe('UsageRecorder', () => {
     });
 
     it('should handle date changes correctly', async () => {
-      global.updateUsageStats.mockResolvedValue(true);
+      updateUsageStats.mockResolvedValue(true);
 
       await startTrackingSiteTime('site1');
       
@@ -290,7 +284,7 @@ describe('UsageRecorder', () => {
 
       await stopTrackingSiteTime();
 
-      expect(global.updateUsageStats).toHaveBeenCalled();
+      expect(updateUsageStats).toHaveBeenCalled();
     });
   });
 

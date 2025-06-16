@@ -38,7 +38,6 @@ import { getTimeoutNotes, addTimeoutNote, updateTimeoutNote, deleteTimeoutNote }
 import { 
   categorizeError, 
   validateRequiredFields, 
-  safeBrowserApiCall,
   ERROR_TYPES 
 } from './validation_utils.js';
 
@@ -151,11 +150,11 @@ async function handleTabActivityChange(activityInfo) {
  * @param {Object} message - The message object sent from UI
  * @param {string} message.action - The action to perform
  * @param {Object} [message.payload] - Data associated with the action
- * @param {Object} sender - Information about the message sender
- * @param {Function} sendResponse - Function to send response back
+ * @param {Object} _sender - Information about the message sender
+ * @param {Function} _sendResponse - Function to send response back
  * @returns {Promise<any>|boolean} Response data or boolean indicating async response
  */
-async function handleMessage(message, sender, sendResponse) {
+async function handleMessage(message, _sender, _sendResponse) {
   console.log('[Main] Received message:', message.action, message.payload);
   
   // Validate basic message structure

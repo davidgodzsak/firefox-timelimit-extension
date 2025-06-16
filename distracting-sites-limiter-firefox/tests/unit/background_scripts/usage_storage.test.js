@@ -29,7 +29,7 @@ describe('usage_storage.js', () => {
 
     mockStorageArea.get.mockImplementation(async (key) => {
         const result = {};
-        if (mockLocalStorageData.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(mockLocalStorageData, key)) {
           result[key] = mockLocalStorageData[key];
         }
         return Promise.resolve(result);

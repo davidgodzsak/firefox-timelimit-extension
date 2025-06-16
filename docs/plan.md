@@ -384,13 +384,13 @@ I will now generate the plan in the requested markdown format.
           * `docs/change_log.md`
       * **Step Dependencies**: All features implemented.
 
-  - [ ] Step 6.2: Add In-code Comments and Review File Sizes
+  - [x] Step 6.2: Add In-code Comments and Review File Sizes
 
       * **Task**: Review all JavaScript files. Add concise comments for complex logic or non-obvious sections. Ensure all files adhere to the \<200 lines of code rule; refactor if any file has grown too large.
       * **Files**: All `.js` files.
       * **Step Dependencies**: All coding steps.
 
-  - [ ] Step 6.3: Final `manifest.json` Review
+  - [x] Step 6.3: Final `manifest.json` Review
 
       * **Task**: Perform a final review of `manifest.json`. Check for:
           * Correct `manifest_version`, `name`, `version`, `description`.
@@ -401,7 +401,7 @@ I will now generate the plan in the requested markdown format.
           * `manifest.json`
       * **Step Dependencies**: All steps that modify `manifest.json`.
 
-  - [ ] Step 6.4: Prepare Build/Packaging Scripts
+  - [x] Step 6.4: Prepare Build/Packaging Scripts
 
       * **Task**: Add scripts to `package.json` for:
           * `lint`: Runs ESLint.
