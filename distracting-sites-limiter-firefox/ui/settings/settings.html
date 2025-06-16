@@ -63,9 +63,22 @@
                                     min="1"
                                     max="1440"
                                     aria-describedby="time-limit-help"
-                                    required
                                 >
-                                <small id="time-limit-help" class="form-help">Maximum 1440 minutes (24 hours)</small>
+                                <small id="time-limit-help" class="form-help">Maximum 1440 minutes (24 hours), leave empty for no limit</small>
+                            </div>
+                            <div class="form-group open-limit-group">
+                                <label for="open-limit" class="form-label">Daily Open Limit</label>
+                                <input 
+                                    type="number" 
+                                    id="open-limit" 
+                                    name="openLimit" 
+                                    class="form-input" 
+                                    placeholder="5"
+                                    min="1"
+                                    max="100"
+                                    aria-describedby="open-limit-help"
+                                >
+                                <small id="open-limit-help" class="form-help">Maximum opens per day, leave empty for no limit</small>
                             </div>
                             <button type="submit" class="btn btn-primary" aria-label="Add site">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -178,6 +191,6 @@
     </div>
 
     <script src="error-handler.js"></script>
-    <script src="settings.js"></script>
+    <script type="module" src="settings.js"></script>
 </body>
 </html> 

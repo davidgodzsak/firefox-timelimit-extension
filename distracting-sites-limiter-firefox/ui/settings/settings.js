@@ -3,7 +3,11 @@
  * @description JavaScript for the settings page of the Firefox Distraction Limiter extension
  * Handles loading initial data, form submissions, and UI state management
  * Communicates with background scripts via browser.runtime.sendMessage API
+ * Enhanced with inline editing components and open count limit support
  */
+
+// Import inline editing components
+import { LimitForm } from './components/limit-form.js';
 
 // Ensure browser API is available (compatibility check)
 if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
@@ -19,6 +23,7 @@ class SettingsManager {
         this.distractingSites = [];
         this.timeoutNotes = [];
         this.isLoading = false;
+        this.limitForms = new Map(); // Track limit form instances
         
         // DOM elements
         this.elements = {
@@ -29,6 +34,7 @@ class SettingsManager {
             // Input fields
             siteUrlInput: document.getElementById('site-url'),
             timeLimitInput: document.getElementById('time-limit'),
+            openLimitInput: document.getElementById('open-limit'), // NEW: Open limit input
             noteTextInput: document.getElementById('note-text'),
             
             // Lists and containers
@@ -89,6 +95,7 @@ class SettingsManager {
         // Input validation
         this.elements.siteUrlInput.addEventListener('input', this.validateSiteUrl.bind(this));
         this.elements.timeLimitInput.addEventListener('input', this.validateTimeLimit.bind(this));
+        this.elements.openLimitInput.addEventListener('input', this.validateOpenLimit.bind(this)); // NEW: Open limit validation
         this.elements.noteTextInput.addEventListener('input', this.validateNoteText.bind(this));
     }
     
@@ -151,9 +158,27 @@ class SettingsManager {
     async handleAddSite() {
         const urlPattern = this.elements.siteUrlInput.value.trim();
         const timeLimit = parseInt(this.elements.timeLimitInput.value);
+        const openLimit = parseInt(this.elements.openLimitInput.value); // NEW: Open limit support
         
-        // Validate inputs
-        if (!this.validateSiteUrl() || !this.validateTimeLimit()) {
+        // Validate inputs - at least one limit must be specified
+        if (!this.validateSiteUrl()) {
+            return;
+        }
+        
+        const hasTimeLimit = !isNaN(timeLimit) && timeLimit > 0;
+        const hasOpenLimit = !isNaN(openLimit) && openLimit > 0;
+        
+        if (!hasTimeLimit && !hasOpenLimit) {
+            this.showToast('Please specify at least one limit (time or opens).', 'warning');
+            return;
+        }
+        
+        if (hasTimeLimit && !this.validateTimeLimit()) {
+            return;
+        }
+        
+        if (hasOpenLimit && (openLimit <= 0 || openLimit > 100)) {
+            this.showToast('Open limit must be between 1 and 100.', 'warning');
             return;
         }
         
@@ -166,20 +191,44 @@ class SettingsManager {
         try {
             this.showLoading(true);
             
+            const payload = {
+                urlPattern: urlPattern,
+                isEnabled: true
+            };
+            
+            // Add time limit if specified
+            if (hasTimeLimit) {
+                payload.dailyLimitSeconds = timeLimit * 60; // Convert minutes to seconds
+            } else {
+                payload.dailyLimitSeconds = 0; // No time limit
+            }
+            
+            // Add open limit if specified
+            if (hasOpenLimit) {
+                payload.dailyOpenLimit = openLimit;
+            }
+            
             const response = await browser.runtime.sendMessage({
                 action: 'addDistractingSite',
-                payload: {
-                    urlPattern: urlPattern,
-                    dailyLimitSeconds: timeLimit * 60, // Convert minutes to seconds
-                    isEnabled: true
-                }
+                payload: payload
             });
             
             if (response && response.success) {
                 this.distractingSites.push(response.data);
                 this.renderSites();
                 this.elements.addSiteForm.reset();
-                this.showToast(`Added "${urlPattern}" with ${timeLimit} minute limit.`, 'success');
+                
+                // Create descriptive message
+                let limitDescription = '';
+                if (hasTimeLimit && hasOpenLimit) {
+                    limitDescription = `${timeLimit} minute and ${openLimit} open limits`;
+                } else if (hasTimeLimit) {
+                    limitDescription = `${timeLimit} minute limit`;
+                } else {
+                    limitDescription = `${openLimit} open limit`;
+                }
+                
+                this.showToast(`Added "${urlPattern}" with ${limitDescription}.`, 'success');
             } else {
                 // Enhanced error handling based on error type
                 const error = response?.error;
@@ -190,6 +239,8 @@ class SettingsManager {
                         this.elements.siteUrlInput.focus();
                     } else if (error.field === 'dailyLimitSeconds') {
                         this.elements.timeLimitInput.focus();
+                    } else if (error.field === 'dailyOpenLimit') {
+                        this.elements.openLimitInput.focus();
                     }
                 } else if (error?.type === 'STORAGE_ERROR') {
                     this.showToast(error.message || 'Storage error occurred. Please try again.', 'error');
@@ -198,7 +249,7 @@ class SettingsManager {
                     // Optionally offer to reload the page
                     setTimeout(() => {
                         if (confirm('Would you like to refresh the page now?')) {
-                            location.reload();
+                            window.location.reload();
                         }
                     }, 2000);
                 } else {
@@ -206,12 +257,8 @@ class SettingsManager {
                 }
             }
         } catch (error) {
-            console.error('Error adding site:', error);
-            if (error.message.includes('Extension context invalidated')) {
-                this.showToast('Extension was reloaded. Please refresh this page.', 'error');
-            } else {
-                this.showToast('Failed to add site. Please try again.', 'error');
-            }
+            console.error('[Settings] Error adding site:', error);
+            this.showToast('Failed to add site. Please try again.', 'error');
         } finally {
             this.showLoading(false);
         }
@@ -283,35 +330,61 @@ class SettingsManager {
     }
     
     /**
-     * Handle editing a site's time limit
+     * Handle editing a site (now accepts updates object for flexible editing)
      */
-    async handleEditSite(siteId, newTimeLimit) {
+    async handleEditSite(siteId, updates) {
+        if (!siteId || !updates || typeof updates !== 'object') {
+            console.error('[Settings] Invalid parameters for handleEditSite:', { siteId, updates });
+            return;
+        }
+        
         try {
             this.showLoading(true);
             
             const response = await browser.runtime.sendMessage({
                 action: 'updateDistractingSite',
-                payload: {
-                    id: siteId,
-                    updates: {
-                        dailyLimitSeconds: newTimeLimit * 60 // Convert minutes to seconds
-                    }
-                }
+                payload: { id: siteId, updates: updates }
             });
             
             if (response && response.success) {
+                // Update local data
                 const siteIndex = this.distractingSites.findIndex(site => site.id === siteId);
                 if (siteIndex !== -1) {
-                    this.distractingSites[siteIndex] = response.data;
-                    this.renderSites();
-                    this.showToast('Site updated successfully.', 'success');
+                    this.distractingSites[siteIndex] = { ...this.distractingSites[siteIndex], ...updates };
+                    
+                    // Update the limit form with new data
+                    const limitForm = this.limitForms.get(siteId);
+                    if (limitForm) {
+                        limitForm.updateSiteData(this.distractingSites[siteIndex]);
+                    }
                 }
+                
+                // Create descriptive message
+                let changeDescriptions = [];
+                if (updates.dailyLimitSeconds !== undefined) {
+                    const minutes = Math.round(updates.dailyLimitSeconds / 60);
+                    changeDescriptions.push(`time limit to ${minutes > 0 ? minutes + ' minutes' : 'none'}`);
+                }
+                if (updates.dailyOpenLimit !== undefined) {
+                    changeDescriptions.push(`open limit to ${updates.dailyOpenLimit > 0 ? updates.dailyOpenLimit + ' opens' : 'none'}`);
+                }
+                if (updates.isEnabled !== undefined) {
+                    changeDescriptions.push(`status to ${updates.isEnabled ? 'enabled' : 'disabled'}`);
+                }
+                
+                const site = this.distractingSites[siteIndex];
+                const changeMessage = changeDescriptions.length > 0 
+                    ? `Updated ${changeDescriptions.join(' and ')}`
+                    : 'Updated site';
+                
+                this.showToast(`${changeMessage} for "${site.urlPattern}".`, 'success');
             } else {
-                throw new Error(response?.error || 'Failed to update site');
+                throw new Error(response?.error?.message || 'Failed to update site');
             }
         } catch (error) {
-            console.error('Error updating site:', error);
-            this.showToast('Failed to update site. Please try again.', 'error');
+            console.error('[Settings] Error updating site:', error);
+            this.showToast(`Failed to update site: ${error.message}`, 'error');
+            throw error; // Re-throw for the limit form to handle
         } finally {
             this.showLoading(false);
         }
@@ -321,7 +394,8 @@ class SettingsManager {
      * Handle deleting a site
      */
     async handleDeleteSite(siteId) {
-        if (!confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
+        if (!siteId) {
+            console.error('[Settings] Invalid siteId for handleDeleteSite:', siteId);
             return;
         }
         
@@ -334,15 +408,30 @@ class SettingsManager {
             });
             
             if (response && response.success) {
+                // Clean up limit form
+                const limitForm = this.limitForms.get(siteId);
+                if (limitForm) {
+                    limitForm.destroy();
+                    this.limitForms.delete(siteId);
+                }
+                
+                // Update local data and re-render
+                const site = this.distractingSites.find(site => site.id === siteId);
                 this.distractingSites = this.distractingSites.filter(site => site.id !== siteId);
                 this.renderSites();
-                this.showToast('Site removed successfully.', 'success');
+                
+                if (site) {
+                    this.showToast(`Removed "${site.urlPattern}" from your list.`, 'success');
+                } else {
+                    this.showToast('Site removed successfully.', 'success');
+                }
             } else {
-                throw new Error(response?.error || 'Failed to delete site');
+                throw new Error(response?.error?.message || 'Failed to delete site');
             }
         } catch (error) {
-            console.error('Error deleting site:', error);
-            this.showToast('Failed to delete site. Please try again.', 'error');
+            console.error('[Settings] Error deleting site:', error);
+            this.showToast(`Failed to delete site: ${error.message}`, 'error');
+            throw error; // Re-throw for the limit form to handle
         } finally {
             this.showLoading(false);
         }
@@ -378,37 +467,6 @@ class SettingsManager {
         } catch (error) {
             console.error('Error updating note:', error);
             this.showToast('Failed to update note. Please try again.', 'error');
-        } finally {
-            this.showLoading(false);
-        }
-    }
-    
-    /**
-     * Handle deleting a note
-     */
-    async handleDeleteNote(noteId) {
-        if (!confirm('Are you sure you want to delete this note?')) {
-            return;
-        }
-        
-        try {
-            this.showLoading(true);
-            
-            const response = await browser.runtime.sendMessage({
-                action: 'deleteTimeoutNote',
-                payload: { id: noteId }
-            });
-            
-            if (response && response.success) {
-                this.timeoutNotes = this.timeoutNotes.filter(note => note.id !== noteId);
-                this.renderNotes();
-                this.showToast('Note removed successfully.', 'success');
-            } else {
-                throw new Error(response?.error || 'Failed to delete note');
-            }
-        } catch (error) {
-            console.error('Error deleting note:', error);
-            this.showToast('Failed to delete note. Please try again.', 'error');
         } finally {
             this.showLoading(false);
         }
@@ -472,6 +530,12 @@ class SettingsManager {
             errorElement.remove();
         }
         
+        // Time limit is now optional - allow empty values
+        if (this.elements.timeLimitInput.value.trim() === '') {
+            this.elements.timeLimitInput.classList.remove('error');
+            return true;
+        }
+        
         if (isNaN(timeLimit) || timeLimit <= 0) {
             this.showFieldError(this.elements.timeLimitInput, 'Time limit must be a positive number');
             return false;
@@ -483,6 +547,38 @@ class SettingsManager {
         }
         
         this.elements.timeLimitInput.classList.remove('error');
+        return true;
+    }
+    
+    /**
+     * Validate open limit input
+     */
+    validateOpenLimit() {
+        const openLimit = parseInt(this.elements.openLimitInput.value);
+        const errorElement = this.elements.openLimitInput.parentElement.querySelector('.error-message');
+        
+        // Remove existing error message
+        if (errorElement) {
+            errorElement.remove();
+        }
+        
+        // Open limit is optional - allow empty values
+        if (this.elements.openLimitInput.value.trim() === '') {
+            this.elements.openLimitInput.classList.remove('error');
+            return true;
+        }
+        
+        if (isNaN(openLimit) || openLimit <= 0) {
+            this.showFieldError(this.elements.openLimitInput, 'Open limit must be a positive number');
+            return false;
+        }
+        
+        if (openLimit > 100) {
+            this.showFieldError(this.elements.openLimitInput, 'Open limit cannot exceed 100');
+            return false;
+        }
+        
+        this.elements.openLimitInput.classList.remove('error');
         return true;
     }
     
@@ -589,97 +685,27 @@ class SettingsManager {
     }
     
     /**
-     * Create a site item DOM element
+     * Create a site item using the enhanced LimitForm component
      */
     createSiteItem(site) {
-        const timeInMinutes = Math.round(site.dailyLimitSeconds / 60);
-        
         const item = document.createElement('div');
-        item.className = 'item-card';
+        item.className = 'item-card limit-form-container';
         item.role = 'listitem';
         
-        // Create elements securely instead of using innerHTML
-        const content = document.createElement('div');
-        content.className = 'item-content';
+        // Create LimitForm instance
+        const limitForm = new LimitForm({
+            container: item,
+            siteData: site,
+            onUpdate: async (siteId, updates) => {
+                await this.handleEditSite(siteId, updates);
+            },
+            onDelete: async (siteId) => {
+                await this.handleDeleteSite(siteId);
+            }
+        });
         
-        const info = document.createElement('div');
-        info.className = 'item-info';
-        
-        const title = document.createElement('div');
-        title.className = 'item-title';
-        title.textContent = site.urlPattern;
-        
-        const subtitle = document.createElement('div');
-        subtitle.className = 'item-subtitle';
-        subtitle.textContent = `${timeInMinutes} minute${timeInMinutes !== 1 ? 's' : ''} daily limit`;
-        
-        const actions = document.createElement('div');
-        actions.className = 'item-actions';
-        
-        // Create edit button
-        const editBtn = document.createElement('button');
-        editBtn.className = 'btn btn-secondary btn-small edit-site-btn';
-        editBtn.setAttribute('data-site-id', site.id);
-        editBtn.setAttribute('aria-label', `Edit ${site.urlPattern}`);
-        
-        const editSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        editSvg.setAttribute('width', '14');
-        editSvg.setAttribute('height', '14');
-        editSvg.setAttribute('viewBox', '0 0 24 24');
-        editSvg.setAttribute('fill', 'none');
-        editSvg.setAttribute('stroke', 'currentColor');
-        editSvg.setAttribute('stroke-width', '2');
-        editSvg.setAttribute('stroke-linecap', 'round');
-        editSvg.setAttribute('stroke-linejoin', 'round');
-        
-        const editPath1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        editPath1.setAttribute('d', 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7');
-        const editPath2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        editPath2.setAttribute('d', 'm18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z');
-        
-        editSvg.appendChild(editPath1);
-        editSvg.appendChild(editPath2);
-        editBtn.appendChild(editSvg);
-        editBtn.appendChild(document.createTextNode(' Edit'));
-        
-        // Create delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn btn-danger btn-small delete-site-btn';
-        deleteBtn.setAttribute('data-site-id', site.id);
-        deleteBtn.setAttribute('aria-label', `Delete ${site.urlPattern}`);
-        
-        const deleteSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        deleteSvg.setAttribute('width', '14');
-        deleteSvg.setAttribute('height', '14');
-        deleteSvg.setAttribute('viewBox', '0 0 24 24');
-        deleteSvg.setAttribute('fill', 'none');
-        deleteSvg.setAttribute('stroke', 'currentColor');
-        deleteSvg.setAttribute('stroke-width', '2');
-        deleteSvg.setAttribute('stroke-linecap', 'round');
-        deleteSvg.setAttribute('stroke-linejoin', 'round');
-        
-        const deletePolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        deletePolyline.setAttribute('points', '3,6 5,6 21,6');
-        const deletePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        deletePath.setAttribute('d', 'm19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2');
-        
-        deleteSvg.appendChild(deletePolyline);
-        deleteSvg.appendChild(deletePath);
-        deleteBtn.appendChild(deleteSvg);
-        deleteBtn.appendChild(document.createTextNode(' Delete'));
-        
-        // Assemble the structure
-        info.appendChild(title);
-        info.appendChild(subtitle);
-        actions.appendChild(editBtn);
-        actions.appendChild(deleteBtn);
-        content.appendChild(info);
-        content.appendChild(actions);
-        item.appendChild(content);
-        
-        // Bind event listeners
-        editBtn.addEventListener('click', () => this.promptEditSite(site));
-        deleteBtn.addEventListener('click', () => this.handleDeleteSite(site.id));
+        // Store the form instance for cleanup later
+        this.limitForms.set(site.id, limitForm);
         
         return item;
     }
@@ -771,23 +797,6 @@ class SettingsManager {
         deleteBtn.addEventListener('click', () => this.handleDeleteNote(note.id));
         
         return item;
-    }
-    
-    /**
-     * Prompt user to edit a site's time limit
-     */
-    promptEditSite(site) {
-        const currentMinutes = Math.round(site.dailyLimitSeconds / 60);
-        const newMinutes = prompt(`Edit time limit for ${site.urlPattern}:`, currentMinutes);
-        
-        if (newMinutes !== null) {
-            const minutes = parseInt(newMinutes);
-            if (!isNaN(minutes) && minutes > 0 && minutes <= 1440) {
-                this.handleEditSite(site.id, minutes);
-            } else {
-                this.showToast('Please enter a valid time limit (1-1440 minutes).', 'warning');
-            }
-        }
     }
     
     /**
@@ -972,6 +981,37 @@ class SettingsManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    /**
+     * Handle deleting a note
+     */
+    async handleDeleteNote(noteId) {
+        if (!confirm('Are you sure you want to delete this note?')) {
+            return;
+        }
+        
+        try {
+            this.showLoading(true);
+            
+            const response = await browser.runtime.sendMessage({
+                action: 'deleteTimeoutNote',
+                payload: { id: noteId }
+            });
+            
+            if (response && response.success) {
+                this.timeoutNotes = this.timeoutNotes.filter(note => note.id !== noteId);
+                this.renderNotes();
+                this.showToast('Note removed successfully.', 'success');
+            } else {
+                throw new Error(response?.error?.message || 'Failed to delete note');
+            }
+        } catch (error) {
+            console.error('[Settings] Error deleting note:', error);
+            this.showToast('Failed to delete note. Please try again.', 'error');
+        } finally {
+            this.showLoading(false);
+        }
     }
 }
 

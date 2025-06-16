@@ -96,6 +96,7 @@ function displayBlockedInfo(params) {
 
 /**
  * Creates a DOM element for displaying an alternative activity.
+ * The entire element is clickable for shuffling to a new activity.
  * 
  * @param {Object} activity - The activity object
  * @param {string} activity.text - The activity description
@@ -105,11 +106,13 @@ function displayBlockedInfo(params) {
 function createActivityElement(activity) {
     const div = document.createElement('div');
     div.className = 'activity-item';
-    div.setAttribute('role', 'listitem');
+    div.setAttribute('role', 'button');
+    div.setAttribute('tabindex', '0');
     div.textContent = activity.text;
     
     // Add accessibility attributes
-    div.setAttribute('aria-label', `Suggested activity: ${activity.text}`);
+    div.setAttribute('aria-label', `Suggested activity: ${activity.text}. Click to get a new suggestion.`);
+    div.setAttribute('title', 'Click to get a new suggestion');
     
     return div;
 }
@@ -416,10 +419,83 @@ function handleVisibilityChange() {
 }
 
 /**
+ * Handles shuffling to get a new random motivational note.
+ * Provides visual feedback during the shuffle process.
+ */
+async function shuffleMotivationalNote() {
+    const container = document.getElementById('alternative-activities');
+    
+    if (!container) {
+        console.error('[Timeout] Activities container not found');
+        return;
+    }
+    
+    try {
+        // Add slight fade to current content during shuffle
+        container.style.opacity = '0.6';
+        container.style.transition = 'opacity 0.3s ease';
+        
+        console.log('[Timeout] Shuffling motivational note...');
+        
+        // Fetch a new random note
+        const randomNote = await fetchRandomTimeoutNote();
+        
+        // Small delay for better UX (makes the shuffle feel more intentional)
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (randomNote) {
+            console.log('[Timeout] Shuffled to new note:', randomNote);
+            displayAlternativeActivities([randomNote]);
+        } else {
+            console.log('[Timeout] No new note available from shuffle');
+            // Keep existing content or show fallback
+            displayAlternativeActivities([]);
+        }
+        
+        // Restore opacity
+        container.style.opacity = '1';
+        
+    } catch (error) {
+        console.error('[Timeout] Error during shuffle:', error);
+        
+        // Restore opacity and show fallback on error
+        container.style.opacity = '1';
+        displayAlternativeActivities([]);
+    }
+}
+
+/**
  * Sets up event listeners for the timeout page.
- * Enhanced with additional resilience features.
+ * Enhanced with additional resilience features and shuffle functionality.
  */
 function setupEventListeners() {
+    // Handle activity item clicks for shuffling using event delegation
+    const activitiesContainer = document.getElementById('alternative-activities');
+    if (activitiesContainer) {
+        activitiesContainer.addEventListener('click', (event) => {
+            // Check if the clicked element is an activity item
+            const activityItem = event.target.closest('.activity-item');
+            if (activityItem) {
+                event.preventDefault();
+                event.stopPropagation();
+                shuffleMotivationalNote();
+            }
+        });
+        
+        // Handle keyboard events for accessibility
+        activitiesContainer.addEventListener('keydown', (event) => {
+            const activityItem = event.target.closest('.activity-item');
+            if (activityItem && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                shuffleMotivationalNote();
+            }
+        });
+        
+        console.log('[Timeout] Activity item click and keyboard event listeners added');
+    } else {
+        console.warn('[Timeout] Activities container not found for event delegation');
+    }
+    
     // Handle page visibility changes (user switching tabs/windows)
     document.addEventListener('visibilitychange', handleVisibilityChange);
     

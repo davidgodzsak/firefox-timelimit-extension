@@ -34,6 +34,7 @@ const originalDate = global.Date;
 // To be imported in beforeEach
 let checkAndBlockSite;
 let handlePotentialRedirect;
+let checkOpenLimitBeforeAccess;
 
 
 describe('site_blocker.js', () => {
@@ -44,6 +45,7 @@ describe('site_blocker.js', () => {
     const siteBlockerModule = await import('../../../background_scripts/site_blocker.js');
     checkAndBlockSite = siteBlockerModule.checkAndBlockSite;
     handlePotentialRedirect = siteBlockerModule.handlePotentialRedirect;
+    checkOpenLimitBeforeAccess = siteBlockerModule.checkOpenLimitBeforeAccess;
     
     // Reset all mocks
     mockGetDistractingSites.mockReset();
@@ -82,7 +84,8 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: false,
         siteId: null,
-        reason: null
+        reason: null,
+        limitType: null
       });
     });
 
@@ -94,7 +97,8 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: false,
         siteId: null,
-        reason: null
+        reason: null,
+        limitType: null
       });
     });
 
@@ -106,7 +110,8 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: false,
         siteId: null,
-        reason: null
+        reason: null,
+        limitType: null
       });
     });
 
@@ -120,7 +125,8 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: false,
         siteId: 'site1',
-        reason: null
+        reason: null,
+        limitType: null
       });
     });
 
@@ -134,7 +140,158 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: true,
         siteId: 'site1',
-        reason: "You've spent 67 minutes on this site today, exceeding your 60 minute limit."
+        reason: "You've spent 67 minutes on this site today, exceeding your 60 minute limit.",
+        limitType: 'time'
+      });
+    });
+
+    it('should return shouldBlock: false when under open limit', async () => {
+      const sitesWithOpenLimit = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 99999, // Very high time limit
+          dailyOpenLimit: 10,
+          isEnabled: true
+        }
+      ];
+
+      mockGetDistractingSites.mockResolvedValue(sitesWithOpenLimit);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 5 } // Under open limit
+      });
+
+      const result = await checkAndBlockSite('tab1', 'http://example.com');
+      expect(result).toEqual({
+        shouldBlock: false,
+        siteId: 'site1',
+        reason: null,
+        limitType: null
+      });
+    });
+
+    it('should return shouldBlock: true when open limit exceeded', async () => {
+      const sitesWithOpenLimit = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 99999, // Very high time limit
+          dailyOpenLimit: 5,
+          isEnabled: true
+        }
+      ];
+
+      mockGetDistractingSites.mockResolvedValue(sitesWithOpenLimit);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 8 } // Over open limit
+      });
+
+      const result = await checkAndBlockSite('tab1', 'http://example.com');
+      expect(result).toEqual({
+        shouldBlock: true,
+        siteId: 'site1',
+        reason: "You've opened this site 8 times today, exceeding your 5 open limit.",
+        limitType: 'opens'
+      });
+    });
+
+    it('should return shouldBlock: true when both limits exceeded', async () => {
+      const sitesWithBothLimits = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600, // 1 hour
+          dailyOpenLimit: 5,
+          isEnabled: true
+        }
+      ];
+
+      mockGetDistractingSites.mockResolvedValue(sitesWithBothLimits);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 4000, opens: 8 } // Both limits exceeded
+      });
+
+      const result = await checkAndBlockSite('tab1', 'http://example.com');
+      expect(result).toEqual({
+        shouldBlock: true,
+        siteId: 'site1',
+        reason: "You've exceeded both your time limit (67/60 minutes) and open limit (8/5 opens) for this site today.",
+        limitType: 'both'
+      });
+    });
+
+    it('should work with open-only limits (no time limit)', async () => {
+      const sitesOpenOnly = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 0, // No time limit
+          dailyOpenLimit: 3,
+          isEnabled: true
+        }
+      ];
+
+      mockGetDistractingSites.mockResolvedValue(sitesOpenOnly);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 5000, opens: 5 } // Time doesn't matter, opens exceeded
+      });
+
+      const result = await checkAndBlockSite('tab1', 'http://example.com');
+      expect(result).toEqual({
+        shouldBlock: true,
+        siteId: 'site1',
+        reason: "You've opened this site 5 times today, exceeding your 3 open limit.",
+        limitType: 'opens'
+      });
+    });
+
+    it('should prioritize time limit when only time limit exceeded', async () => {
+      const sitesWithBothLimits = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600, // 1 hour
+          dailyOpenLimit: 10,
+          isEnabled: true
+        }
+      ];
+
+      mockGetDistractingSites.mockResolvedValue(sitesWithBothLimits);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 4000, opens: 5 } // Only time limit exceeded
+      });
+
+      const result = await checkAndBlockSite('tab1', 'http://example.com');
+      expect(result).toEqual({
+        shouldBlock: true,
+        siteId: 'site1',
+        reason: "You've spent 67 minutes on this site today, exceeding your 60 minute limit.",
+        limitType: 'time'
+      });
+    });
+
+    it('should handle sites without open limits gracefully', async () => {
+      const sitesTimeOnly = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600, // 1 hour
+          // No dailyOpenLimit property
+          isEnabled: true
+        }
+      ];
+
+      mockGetDistractingSites.mockResolvedValue(sitesTimeOnly);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 100 } // Many opens but no limit
+      });
+
+      const result = await checkAndBlockSite('tab1', 'http://example.com');
+      expect(result).toEqual({
+        shouldBlock: false,
+        siteId: 'site1',
+        reason: null,
+        limitType: null
       });
     });
 
@@ -145,7 +302,8 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: false,
         siteId: null,
-        reason: null
+        reason: null,
+        limitType: null
       });
     });
 
@@ -156,7 +314,8 @@ describe('site_blocker.js', () => {
       expect(result).toEqual({
         shouldBlock: false,
         siteId: null,
-        reason: null
+        reason: null,
+        limitType: null
       });
     });
 
@@ -221,12 +380,13 @@ describe('site_blocker.js', () => {
         url: expect.stringContaining('timeout.html')
       });
 
-      // Verify URL parameters
+      // Verify URL parameters including new limitType parameter
       const updateCall = browser.tabs.update.mock.calls[0];
       const redirectUrl = new URL(updateCall[1].url);
       expect(redirectUrl.searchParams.get('blockedUrl')).toBe(blockedUrl);
       expect(redirectUrl.searchParams.get('siteId')).toBe(siteId);
       expect(redirectUrl.searchParams.get('reason')).toBeTruthy();
+      expect(redirectUrl.searchParams.get('limitType')).toBe('time');
     });
 
     it('should handle errors gracefully', async () => {
@@ -235,6 +395,196 @@ describe('site_blocker.js', () => {
       const wasRedirected = await handlePotentialRedirect('tab1', 'https://example.com');
       expect(wasRedirected).toBe(false);
       expect(browser.tabs.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkOpenLimitBeforeAccess', () => {
+    it('should return wouldExceed: false for invalid URL', async () => {
+      const result = await checkOpenLimitBeforeAccess('');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: null,
+        currentOpens: 0,
+        limit: 0
+      });
+    });
+
+    it('should return wouldExceed: false for non-matching URLs', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 5,
+          isEnabled: true
+        }
+      ]);
+
+      const result = await checkOpenLimitBeforeAccess('http://nonmatching.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: null,
+        currentOpens: 0,
+        limit: 0
+      });
+    });
+
+    it('should return wouldExceed: false for sites without open limits', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600,
+          // No dailyOpenLimit
+          isEnabled: true
+        }
+      ]);
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: null,
+        currentOpens: 0,
+        limit: 0
+      });
+    });
+
+    it('should return wouldExceed: false for disabled sites', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 5,
+          isEnabled: false
+        }
+      ]);
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: null,
+        currentOpens: 0,
+        limit: 0
+      });
+    });
+
+    it('should return wouldExceed: false when well under limit', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 10,
+          isEnabled: true
+        }
+      ]);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 3 }
+      });
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: 'site1',
+        currentOpens: 3,
+        limit: 10
+      });
+    });
+
+    it('should return wouldExceed: false when at limit but not exceeding', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 5,
+          isEnabled: true
+        }
+      ]);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 4 } // One more would reach limit
+      });
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: 'site1',
+        currentOpens: 4,
+        limit: 5
+      });
+    });
+
+    it('should return wouldExceed: true when one more open would exceed limit', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 5,
+          isEnabled: true
+        }
+      ]);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 5 } // At limit, one more would exceed
+      });
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: true,
+        siteId: 'site1',
+        currentOpens: 5,
+        limit: 5
+      });
+    });
+
+    it('should return wouldExceed: true when already over limit', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 3,
+          isEnabled: true
+        }
+      ]);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 5 } // Already over limit
+      });
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: true,
+        siteId: 'site1',
+        currentOpens: 5,
+        limit: 3
+      });
+    });
+
+    it('should handle missing usage data gracefully', async () => {
+      mockGetDistractingSites.mockResolvedValue([
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyOpenLimit: 5,
+          isEnabled: true
+        }
+      ]);
+      mockGetUsageStats.mockResolvedValue({}); // No usage data
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: 'site1',
+        currentOpens: 0,
+        limit: 5
+      });
+    });
+
+    it('should handle storage errors gracefully', async () => {
+      mockGetDistractingSites.mockRejectedValue(new Error('Storage error'));
+
+      const result = await checkOpenLimitBeforeAccess('http://example.com');
+      expect(result).toEqual({
+        wouldExceed: false,
+        siteId: null,
+        currentOpens: 0,
+        limit: 0
+      });
     });
   });
 }); 

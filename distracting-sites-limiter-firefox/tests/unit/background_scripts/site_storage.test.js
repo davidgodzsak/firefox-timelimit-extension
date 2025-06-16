@@ -118,6 +118,43 @@ describe('Site Storage Module', () => {
       }]);
     });
 
+    it('should add a site with daily open limit successfully', async () => {
+      const siteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        dailyOpenLimit: 10,
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(siteData);
+
+      expect(result).toEqual({
+        id: 'test-uuid-1',
+        ...siteData
+      });
+      expect(mockLocalStorageData.distractingSites).toEqual([{
+        id: 'test-uuid-1',
+        ...siteData
+      }]);
+    });
+
+    it('should add a site with only open limit (no time limit)', async () => {
+      const siteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 1, // Minimum required value
+        dailyOpenLimit: 5,
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(siteData);
+
+      expect(result).toEqual({
+        id: 'test-uuid-1',
+        ...siteData
+      });
+      expect(result.dailyOpenLimit).toBe(5);
+    });
+
     it('should validate required fields', async () => {
       const invalidSiteData = {
         dailyLimitSeconds: 3600,
@@ -128,6 +165,45 @@ describe('Site Storage Module', () => {
       const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
       expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid siteObject provided to addDistractingSite. 'urlPattern' (string) and 'dailyLimitSeconds' (positive number) are required.", expect.any(Object));
+    });
+
+    it('should validate dailyOpenLimit when provided', async () => {
+      const invalidSiteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        dailyOpenLimit: -5, // Invalid negative value
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(invalidSiteData);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", -5);
+    });
+
+    it('should validate dailyOpenLimit is a number when provided', async () => {
+      const invalidSiteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        dailyOpenLimit: 'invalid', // Should be a number
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(invalidSiteData);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", 'invalid');
+    });
+
+    it('should validate dailyOpenLimit is positive when provided', async () => {
+      const invalidSiteData = {
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        dailyOpenLimit: 0, // Should be positive
+        isEnabled: true
+      };
+
+      const result = await siteStorage.addDistractingSite(invalidSiteData);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", 0);
     });
 
     it('should validate urlPattern format', async () => {
@@ -215,6 +291,59 @@ describe('Site Storage Module', () => {
       expect(mockLocalStorageData.distractingSites[0]).toEqual(result);
     });
 
+    it('should update site with dailyOpenLimit successfully', async () => {
+      const updates = {
+        dailyOpenLimit: 10
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', updates);
+
+      expect(result).toEqual({
+        id: 'site1',
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 3600,
+        dailyOpenLimit: 10,
+        isEnabled: true
+      });
+      expect(mockLocalStorageData.distractingSites[0]).toEqual(result);
+    });
+
+    it('should update both time and open limits simultaneously', async () => {
+      const updates = {
+        dailyLimitSeconds: 7200,
+        dailyOpenLimit: 15
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', updates);
+
+      expect(result).toEqual({
+        id: 'site1',
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 7200,
+        dailyOpenLimit: 15,
+        isEnabled: true
+      });
+    });
+
+    it('should remove dailyOpenLimit when not specified in updates', async () => {
+      // First add a site with open limit
+      mockLocalStorageData.distractingSites[0].dailyOpenLimit = 5;
+
+      const updates = {
+        dailyLimitSeconds: 7200
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', updates);
+
+      expect(result).toEqual({
+        id: 'site1',
+        urlPattern: 'facebook.com',
+        dailyLimitSeconds: 7200,
+        dailyOpenLimit: 5, // Should preserve existing value
+        isEnabled: true
+      });
+    });
+
     it('should return null for non-existent site', async () => {
       const updates = { dailyLimitSeconds: 7200 };
 
@@ -230,6 +359,36 @@ describe('Site Storage Module', () => {
       const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
       expect(result).toBeNull();
       expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyLimitSeconds in updates for updateDistractingSite.', expect.any(Number));
+    });
+
+    it('should validate updated dailyOpenLimit', async () => {
+      const invalidUpdates = {
+        dailyOpenLimit: -5 // Negative
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyOpenLimit in updates for updateDistractingSite.', -5);
+    });
+
+    it('should validate dailyOpenLimit is a number', async () => {
+      const invalidUpdates = {
+        dailyOpenLimit: 'invalid' // Not a number
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyOpenLimit in updates for updateDistractingSite.', 'invalid');
+    });
+
+    it('should validate dailyOpenLimit is positive', async () => {
+      const invalidUpdates = {
+        dailyOpenLimit: 0 // Zero is not positive
+      };
+
+      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyOpenLimit in updates for updateDistractingSite.', 0);
     });
 
     it('should allow updating to any URL pattern', async () => {

@@ -1,6 +1,7 @@
 /**
  * @file site_storage.js
  * @description Manages CRUD operations for distracting sites in browser.storage.local.
+ * Updated to support both time limits and open count limits.
  */
 
 /**
@@ -30,6 +31,7 @@ export async function getDistractingSites() {
  * @param {Object} siteObject - The site object to add.
  * @param {string} siteObject.urlPattern - The URL pattern for the site.
  * @param {number} siteObject.dailyLimitSeconds - The daily time limit in seconds.
+ * @param {number} [siteObject.dailyOpenLimit] - The daily open count limit (optional).
  * @param {boolean} [siteObject.isEnabled=true] - Whether the site rule is enabled.
  * @returns {Promise<Object|null>} A promise that resolves to the added site object (including its new ID)
  *                                 or null if validation fails or a storage error occurs.
@@ -41,12 +43,24 @@ export async function addDistractingSite(siteObject) {
     return null;
   }
 
+  // Validate dailyOpenLimit if provided
+  if (siteObject.hasOwnProperty('dailyOpenLimit') && 
+      (typeof siteObject.dailyOpenLimit !== 'number' || siteObject.dailyOpenLimit <= 0)) {
+    console.error("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", siteObject.dailyOpenLimit);
+    return null;
+  }
+
   const newSite = {
     id: crypto.randomUUID(),
     urlPattern: siteObject.urlPattern.trim(),
     dailyLimitSeconds: siteObject.dailyLimitSeconds,
     isEnabled: typeof siteObject.isEnabled === 'boolean' ? siteObject.isEnabled : true,
   };
+
+  // Add dailyOpenLimit if provided
+  if (siteObject.hasOwnProperty('dailyOpenLimit')) {
+    newSite.dailyOpenLimit = siteObject.dailyOpenLimit;
+  }
 
   try {
     const sites = await getDistractingSites();
@@ -69,6 +83,7 @@ export async function addDistractingSite(siteObject) {
  * @param {Object} updates - An object containing the properties to update.
  * @param {string} [updates.urlPattern] - The new URL pattern.
  * @param {number} [updates.dailyLimitSeconds] - The new daily time limit in seconds.
+ * @param {number} [updates.dailyOpenLimit] - The new daily open count limit.
  * @param {boolean} [updates.isEnabled] - The new enabled state.
  * @returns {Promise<Object|null>} A promise that resolves to the updated site object
  *                                 or null if the site is not found, validation fails, or a storage error occurs.
@@ -90,6 +105,10 @@ export async function updateDistractingSite(siteId, updates) {
   }
   if (Object.prototype.hasOwnProperty.call(updates, 'dailyLimitSeconds') && (typeof updates.dailyLimitSeconds !== 'number' || updates.dailyLimitSeconds <= 0)) {
     console.error("Invalid dailyLimitSeconds in updates for updateDistractingSite.", updates.dailyLimitSeconds);
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'dailyOpenLimit') && (typeof updates.dailyOpenLimit !== 'number' || updates.dailyOpenLimit <= 0)) {
+    console.error("Invalid dailyOpenLimit in updates for updateDistractingSite.", updates.dailyOpenLimit);
     return null;
   }
   if (Object.prototype.hasOwnProperty.call(updates, 'isEnabled') && typeof updates.isEnabled !== 'boolean') {

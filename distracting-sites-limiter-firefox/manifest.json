@@ -1,8 +1,7 @@
 {
   "manifest_version": 3,
-  "id": "distraction-limiter@davidgodzsak.dev",
   "name": "Distraction Limiter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached. Features customizable time limits, motivational timeout notes, and clean modern UI.",
   "author": "Dávid Godzsák",
   "homepage_url": "https://github.com/davidgodzsak/firefox-timelimit-extension",
@@ -11,6 +10,14 @@
     "32": "assets/icons/icon-32.png",
     "48": "assets/icons/icon-48.png",
     "128": "assets/icons/icon-128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png"
+    },
+    "default_title": "Distraction Limiter",
+    "default_popup": "ui/popup/popup.html"
   },
   "background": {
     "scripts": [
@@ -22,7 +29,8 @@
     "storage",
     "alarms",
     "tabs",
-    "webNavigation"
+    "webNavigation",
+    "activeTab"
   ],
   "options_ui": {
     "page": "ui/settings/settings.html",
@@ -34,6 +42,11 @@
         "ui/timeout/timeout.html",
         "ui/timeout/timeout.css",
         "ui/timeout/timeout.js",
+        "ui/popup/popup.html",
+        "ui/popup/popup.css",
+        "ui/popup/popup.js",
+        "ui/settings/components/limit-form.js",
+        "ui/settings/components/inline-editor.js",
         "ui/common_assets/css/variables.css",
         "ui/common_assets/css/global.css"
       ],

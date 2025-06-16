@@ -7,13 +7,15 @@
  * - Tab activity monitoring and distraction detection
  * - Time tracking and usage recording
  * - Site blocking when limits are exceeded
- * - Message passing with UI components (settings and timeout pages)
+ * - Message passing with UI components (settings, timeout, and popup pages)
+ * - Toolbar badge management and action handling
  * 
  * Architecture:
  * - Tab Activity Monitor: Detects tab changes and browser focus
  * - Distraction Detector: Checks if URLs match distracting sites
  * - Usage Recorder: Tracks time spent and opens for distracting sites  
  * - Site Blocker: Enforces limits by redirecting to timeout page
+ * - Badge Manager: Updates toolbar badge with remaining limits
  * - Daily Reset: Resets usage statistics daily
  * - Storage Modules: Handle data persistence
  */
@@ -29,6 +31,11 @@ import {
   recordSiteOpen 
 } from './usage_recorder.js';
 import { handlePotentialRedirect } from './site_blocker.js';
+import { 
+  initializeBadgeManager, 
+  updateBadgeForTab, 
+  refreshCurrentTabBadge 
+} from './badge_manager.js';
 
 // Storage module imports for message handling
 import { getDistractingSites, addDistractingSite, updateDistractingSite, deleteDistractingSite } from './site_storage.js';
@@ -98,6 +105,9 @@ async function handleTabActivityChange(activityInfo) {
       console.log(`[Main] Stopping tracking for previous site: ${_orchestrationState.currentlyTrackedSiteId}`);
       await stopTrackingSiteTime();
       _orchestrationState.currentlyTrackedSiteId = null;
+      
+      // Refresh badge after stopping tracking (usage may have updated)
+      await refreshCurrentTabBadge();
     }
     
     if (isMatch && siteId) {
@@ -117,6 +127,9 @@ async function handleTabActivityChange(activityInfo) {
           // Start tracking time for this site
           await startTrackingSiteTime(siteId);
           _orchestrationState.currentlyTrackedSiteId = siteId;
+          
+          // Refresh badge after recording open (usage updated)
+          await refreshCurrentTabBadge();
         } else {
           console.log(`[Main] Site ${siteId} was blocked and redirected`);
         }
@@ -126,6 +139,9 @@ async function handleTabActivityChange(activityInfo) {
         await recordSiteOpen(siteId);
         await startTrackingSiteTime(siteId);
         _orchestrationState.currentlyTrackedSiteId = siteId;
+        
+        // Refresh badge even on error
+        await refreshCurrentTabBadge();
       }
     } else {
       console.log('[Main] Non-distracting site, no tracking needed');
@@ -228,6 +244,10 @@ async function handleMessage(message, _sender, _sendResponse) {
         
         // Reload distraction detector cache when sites change
         await _reloadDistractionDetectorCache();
+        
+        // Refresh badge for current tab since limits may have changed
+        await refreshCurrentTabBadge();
+        
         return { 
           success: true, 
           data: newSite,
@@ -262,6 +282,10 @@ async function handleMessage(message, _sender, _sendResponse) {
         }
         
         await _reloadDistractionDetectorCache();
+        
+        // Refresh badge for current tab since limits may have changed
+        await refreshCurrentTabBadge();
+        
         return { 
           success: true, 
           data: updatedSite,
@@ -296,6 +320,10 @@ async function handleMessage(message, _sender, _sendResponse) {
         }
         
         await _reloadDistractionDetectorCache();
+        
+        // Refresh badge for current tab since the site may have been removed
+        await refreshCurrentTabBadge();
+        
         return { 
           success: true, 
           data: { deleted: true, id: message.payload.id },
@@ -429,6 +457,230 @@ async function handleMessage(message, _sender, _sendResponse) {
           error: null
         };
       }
+
+      case 'shuffleTimeoutNote': {
+        const notes = await getTimeoutNotes();
+        if (notes && notes.length > 0) {
+          const randomIndex = Math.floor(Math.random() * notes.length);
+          return { 
+            success: true, 
+            data: notes[randomIndex],
+            error: null
+          };
+        }
+        return { 
+          success: true, 
+          data: { text: "Stay focused and make the most of your time!" },
+          error: null
+        };
+      }
+      
+      // === Popup API ===
+      case 'getCurrentPageLimitInfo': {
+        try {
+          // Get current active tab
+          const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+          if (tabs.length === 0) {
+            return {
+              success: false,
+              error: {
+                message: 'No active tab found',
+                type: ERROR_TYPES.SYSTEM,
+                isRetryable: true
+              }
+            };
+          }
+          
+          const activeTab = tabs[0];
+          if (!activeTab.url) {
+            return {
+              success: false,
+              error: {
+                message: 'Cannot access current tab URL',
+                type: ERROR_TYPES.SYSTEM,
+                isRetryable: true
+              }
+            };
+          }
+          
+          // Check if URL is a distracting site
+          const distractionCheck = checkIfUrlIsDistracting(activeTab.url);
+          const { isMatch, siteId } = distractionCheck;
+          
+          if (!isMatch || !siteId) {
+            return {
+              success: true,
+              data: {
+                url: activeTab.url,
+                hostname: new URL(activeTab.url).hostname,
+                isDistractingSite: false,
+                siteInfo: null
+              },
+              error: null
+            };
+          }
+          
+          // Get site information
+          const sites = await getDistractingSites();
+          const site = sites.find(s => s.id === siteId);
+          
+          if (!site) {
+            return {
+              success: true,
+              data: {
+                url: activeTab.url,
+                hostname: new URL(activeTab.url).hostname,
+                isDistractingSite: false,
+                siteInfo: null
+              },
+              error: null
+            };
+          }
+          
+          return {
+            success: true,
+            data: {
+              url: activeTab.url,
+              hostname: new URL(activeTab.url).hostname,
+              isDistractingSite: true,
+              siteInfo: site
+            },
+            error: null
+          };
+          
+        } catch (error) {
+          console.error('[Main] Error getting current page limit info:', error);
+          return {
+            success: false,
+            error: {
+              message: 'Failed to get current page information',
+              type: ERROR_TYPES.SYSTEM,
+              isRetryable: true
+            }
+          };
+        }
+      }
+      
+      case 'addQuickLimit': {
+        const validation = validateRequiredFields(message.payload, ['urlPattern', 'dailyLimitSeconds']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
+        }
+        
+        const newSite = await addDistractingSite(message.payload);
+        if (!newSite) {
+          return {
+            success: false,
+            error: {
+              message: 'Failed to add site limit. Please check the URL format and try again.',
+              type: ERROR_TYPES.STORAGE,
+              isRetryable: true
+            }
+          };
+        }
+        
+        // Reload distraction detector cache when sites change
+        await _reloadDistractionDetectorCache();
+        
+        // Refresh badge for current tab
+        await refreshCurrentTabBadge();
+        
+        return { 
+          success: true, 
+          data: newSite,
+          error: null
+        };
+      }
+      
+      case 'getBadgeInfo': {
+        const validation = validateRequiredFields(message.payload, ['url']);
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: {
+              message: validation.error,
+              type: ERROR_TYPES.VALIDATION,
+              isRetryable: false,
+              field: validation.missingField
+            }
+          };
+        }
+        
+        try {
+          const { url } = message.payload;
+          
+          // Check if URL is a distracting site
+          const distractionCheck = checkIfUrlIsDistracting(url);
+          const { isMatch, siteId } = distractionCheck;
+          
+          if (!isMatch || !siteId) {
+            return {
+              success: true,
+              data: {
+                showBadge: false,
+                badgeText: "",
+                limitInfo: null
+              },
+              error: null
+            };
+          }
+          
+          // Get site and usage information
+          const [sites, usageStats] = await Promise.all([
+            getDistractingSites(),
+            import('./usage_storage.js').then(module => 
+              module.getUsageStats(new Date().toISOString().split('T')[0])
+            )
+          ]);
+          
+          const site = sites.find(s => s.id === siteId);
+          if (!site || !site.isEnabled) {
+            return {
+              success: true,
+              data: {
+                showBadge: false,
+                badgeText: "",
+                limitInfo: null
+              },
+              error: null
+            };
+          }
+          
+          const siteUsage = usageStats[siteId] || { timeSpentSeconds: 0, opens: 0 };
+          
+          return {
+            success: true,
+            data: {
+              showBadge: true,
+              badgeText: "Will be calculated by badge manager",
+              limitInfo: {
+                site: site,
+                usage: siteUsage
+              }
+            },
+            error: null
+          };
+          
+        } catch (error) {
+          console.error('[Main] Error getting badge info:', error);
+          return {
+            success: false,
+            error: {
+              message: 'Failed to get badge information',
+              type: ERROR_TYPES.SYSTEM,
+              isRetryable: true
+            }
+          };
+        }
+      }
       
       // === Debug/Status API ===
       case 'getSystemStatus': {
@@ -491,6 +743,49 @@ async function _reloadDistractionDetectorCache() {
 }
 
 /**
+ * Handles toolbar action button clicks.
+ * The popup will open automatically due to manifest configuration,
+ * but we can handle cases where popup is disabled or fails to open.
+ * @param {Object} tab - The tab where the action was clicked
+ */
+async function handleActionClick(tab) {
+  console.log('[Main] Toolbar action clicked for tab:', tab.id, tab.url);
+  
+  try {
+    // If popup fails to open for any reason, we could implement fallback behavior here
+    // For now, we just log the event since the popup should handle the interaction
+    
+    // Update badge for the current tab to ensure it's up to date
+    if (tab.url) {
+      await updateBadgeForTab(tab.id, tab.url);
+    }
+    
+  } catch (error) {
+    console.error('[Main] Error handling action click:', error);
+  }
+}
+
+/**
+ * Enhanced tab activity change handler that also updates badge text.
+ * @param {Object} activityInfo - Activity information from tab monitor
+ */
+async function handleTabActivityChangeWithBadge(activityInfo) {
+  const { tabId, url, isFocused } = activityInfo;
+  
+  // Call original handler
+  await handleTabActivityChange(activityInfo);
+  
+  // Update badge for the new active tab
+  if (isFocused && tabId && url) {
+    try {
+      await updateBadgeForTab(tabId, url);
+    } catch (error) {
+      console.error('[Main] Error updating badge during tab activity change:', error);
+    }
+  }
+}
+
+/**
  * Initializes all background script modules and sets up orchestration.
  * This is the main startup function called when the background script loads.
  * Enhanced with better error handling and recovery.
@@ -526,9 +821,17 @@ async function initialize() {
       initializationErrors.push({ module: 'distraction_detector', error: error.message });
     }
     
+    console.log('[Main] Initializing badge manager...');
+    try {
+      await initializeBadgeManager();
+    } catch (error) {
+      console.error('[Main] Failed to initialize badge manager:', error);
+      initializationErrors.push({ module: 'badge_manager', error: error.message });
+    }
+    
     console.log('[Main] Initializing tab activity monitor...');
     try {
-      await initializeTabActivityMonitor(handleTabActivityChange);
+      await initializeTabActivityMonitor(handleTabActivityChangeWithBadge);
     } catch (error) {
       console.error('[Main] Failed to initialize tab activity monitor:', error);
       initializationErrors.push({ module: 'tab_activity_monitor', error: error.message });
@@ -541,6 +844,15 @@ async function initialize() {
     } catch (error) {
       console.error('[Main] Failed to set up message listener:', error);
       initializationErrors.push({ module: 'message_listener', error: error.message });
+    }
+    
+    // Set up action button click handler
+    try {
+      browser.action.onClicked.addListener(handleActionClick);
+      console.log('[Main] Action click listener set up successfully');
+    } catch (error) {
+      console.error('[Main] Failed to set up action click listener:', error);
+      initializationErrors.push({ module: 'action_listener', error: error.message });
     }
     
     if (initializationErrors.length > 0) {

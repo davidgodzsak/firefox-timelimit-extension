@@ -61,6 +61,17 @@ async function _updateUsageStatsInStorage(siteId, timeIncrementSeconds, isNewOpe
 
     console.log(`[UsageRecorder] Updating usage: Date: ${dateString}, Site: ${siteId}, Spent: ${siteStats.timeSpentSeconds}s, Opens: ${siteStats.opens}`);
     await updateUsageStats(dateString, siteId, siteStats);
+    
+    // Trigger badge refresh after usage update
+    try {
+      // Import badge manager dynamically to avoid circular dependencies
+      const badgeManager = await import('./badge_manager.js');
+      await badgeManager.refreshCurrentTabBadge();
+    } catch (error) {
+      console.warn('[UsageRecorder] Could not refresh badge after usage update:', error);
+      // Continue without badge refresh - non-critical
+    }
+    
   } catch (error) {
     console.error(`[UsageRecorder] Error updating usage stats for site ${siteId} on ${dateString}:`, error);
   }
