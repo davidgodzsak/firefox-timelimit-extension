@@ -374,7 +374,7 @@ I will now generate the plan in the requested markdown format.
 
 ## Phase 6: Documentation & Finalization
 
-  - [ ] Step 6.1: Create `README.md` and `change_log.md`
+  - [x] Step 6.1: Create `README.md` and `change_log.md`
 
       * **Task**:
           * Create `docs/README.md`: Include project description, features, how to install (load unpacked extension in Firefox), how to build (if applicable), and basic usage.

@@ -8,6 +8,7 @@
  * - Communicates with background scripts to fetch timeout notes
  * - Displays the blocked site URL and motivational alternatives
  * - Provides a calm, encouraging user experience
+ * - Optimized for performance and memory management
  */
 
 /**
@@ -19,6 +20,59 @@ const CONFIG = {
     RETRY_ATTEMPTS: 3,
     RETRY_DELAY: 1000, // 1 second
     DEFAULT_REASON: 'Your daily time limit for this site has been reached.'
+};
+
+/**
+ * Performance and memory management configuration
+ */
+const PERFORMANCE_CONFIG = {
+    ANIMATION_DURATION: 300, // ms for shuffle animation
+    DEBOUNCE_DELAY: 250, // ms to prevent rapid shuffling
+    MAX_CACHED_NOTES: 10, // Maximum notes to cache in memory
+    CACHE_TTL: 30000, // 30 seconds cache TTL
+    CLEANUP_INTERVAL: 60000 // Cleanup interval (1 minute)
+};
+
+/**
+ * Global state management for performance optimization
+ * @private
+ */
+let _pageState = {
+    isInitialized: false,
+    currentNote: null,
+    cachedNotes: new Map(), // Cache for fetched notes
+    timers: new Set(), // Track all timers for cleanup
+    eventListeners: [], // Track event listeners for cleanup
+    lastShuffleTime: 0, // Debounce shuffle requests
+    animationInProgress: false,
+    cleanupInterval: null
+};
+
+/**
+ * Enhanced error handling with categorization
+ * @private
+ */
+const ERROR_HANDLERS = {
+    EXTENSION_CONTEXT: (error) => ({
+        message: 'Extension was reloaded. Please refresh this page.',
+        retry: false,
+        level: 'error'
+    }),
+    NETWORK: (error) => ({
+        message: 'Connection error. Please check your internet connection.',
+        retry: true,
+        level: 'warning'
+    }),
+    STORAGE: (error) => ({
+        message: 'Failed to load motivational notes. Using default message.',
+        retry: true,
+        level: 'warning'
+    }),
+    DEFAULT: (error) => ({
+        message: 'An unexpected error occurred. Please try again.',
+        retry: true,
+        level: 'warning'
+    })
 };
 
 /**
@@ -130,32 +184,39 @@ function displayAlternativeActivities(activities) {
         return;
     }
     
-    // Clear existing content and loading state
-    container.innerHTML = '';
-    container.classList.remove('loading');
-    
-    // Handle empty activities array or null activity
-    const validActivities = activities.filter(activity => activity && activity.text);
-    
-    if (validActivities.length === 0) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'activity-empty';
-        emptyDiv.textContent = 'No alternative activities configured. Why not take a moment to step away from the screen?';
-        container.appendChild(emptyDiv);
-        return;
-    }
-    
-    // Display the single activity (no random selection needed since we get one random note)
-    try {
-        const activityElement = createActivityElement(validActivities[0]);
-        container.appendChild(activityElement);
-    } catch (error) {
-        console.error('[Timeout] Error creating activity element:', error);
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'activity-empty';
-        emptyDiv.textContent = 'Unable to load alternative activities. Consider taking a break!';
-        container.appendChild(emptyDiv);
-    }
+    // Efficient DOM manipulation
+    requestAnimationFrame(() => {
+        // Clear existing content and loading state
+        container.innerHTML = '';
+        container.classList.remove('loading');
+        
+        // Handle empty activities array or null activity
+        const validActivities = activities.filter(activity => activity && activity.text);
+        
+        if (validActivities.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'activity-empty';
+            emptyDiv.textContent = 'No alternative activities configured. Why not take a moment to step away from the screen?';
+            container.appendChild(emptyDiv);
+            return;
+        }
+        
+        // Display the single activity with optimized DOM creation
+        try {
+            const activityElement = createActivityElement(validActivities[0]);
+            container.appendChild(activityElement);
+            
+            // Store current note for shuffle optimization
+            _pageState.currentNote = validActivities[0];
+            
+        } catch (error) {
+            console.error('[Timeout] Error creating activity element:', error);
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'activity-empty';
+            emptyDiv.textContent = 'Unable to load alternative activities. Consider taking a break!';
+            container.appendChild(emptyDiv);
+        }
+    });
 }
 
 /**
@@ -419,10 +480,24 @@ function handleVisibilityChange() {
 }
 
 /**
- * Handles shuffling to get a new random motivational note.
- * Provides visual feedback during the shuffle process.
+ * Enhanced shuffle functionality with animation optimization and debouncing.
+ * Provides visual feedback during the shuffle process with memory management.
  */
 async function shuffleMotivationalNote() {
+    const now = Date.now();
+    
+    // Debounce rapid shuffle requests
+    if (now - _pageState.lastShuffleTime < PERFORMANCE_CONFIG.DEBOUNCE_DELAY) {
+        console.log('[Timeout] Shuffle request debounced');
+        return;
+    }
+    
+    // Prevent concurrent animations
+    if (_pageState.animationInProgress) {
+        console.log('[Timeout] Animation already in progress');
+        return;
+    }
+    
     const container = document.getElementById('alternative-activities');
     
     if (!container) {
@@ -431,20 +506,47 @@ async function shuffleMotivationalNote() {
     }
     
     try {
-        // Add slight fade to current content during shuffle
+        _pageState.animationInProgress = true;
+        _pageState.lastShuffleTime = now;
+        
+        // Optimized animation using CSS transitions
+        container.style.transition = `opacity ${PERFORMANCE_CONFIG.ANIMATION_DURATION}ms ease`;
         container.style.opacity = '0.6';
-        container.style.transition = 'opacity 0.3s ease';
         
         console.log('[Timeout] Shuffling motivational note...');
         
-        // Fetch a new random note
-        const randomNote = await fetchRandomTimeoutNote();
+        // Check cache first for performance
+        const cacheKey = `random-note-${Date.now().toString(36)}`;
+        let randomNote = null;
         
-        // Small delay for better UX (makes the shuffle feel more intentional)
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Try to get a different cached note first
+        const cachedEntries = Array.from(_pageState.cachedNotes.values());
+        const availableCachedNotes = cachedEntries
+            .filter(entry => entry.note && entry.note.id !== _pageState.currentNote?.id)
+            .map(entry => entry.note);
+        
+        if (availableCachedNotes.length > 0) {
+            // Use cached note for better performance
+            randomNote = availableCachedNotes[Math.floor(Math.random() * availableCachedNotes.length)];
+            console.log('[Timeout] Using cached note for shuffle');
+        } else {
+            // Fetch a new random note
+            randomNote = await fetchRandomTimeoutNote();
+            if (randomNote) {
+                _setCachedNote(cacheKey, randomNote);
+            }
+        }
+        
+        // Use requestAnimationFrame for smooth animation
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                _createManagedTimer(resolve, PERFORMANCE_CONFIG.ANIMATION_DURATION);
+            });
+        });
         
         if (randomNote) {
             console.log('[Timeout] Shuffled to new note:', randomNote);
+            _pageState.currentNote = randomNote;
             displayAlternativeActivities([randomNote]);
         } else {
             console.log('[Timeout] No new note available from shuffle');
@@ -452,27 +554,37 @@ async function shuffleMotivationalNote() {
             displayAlternativeActivities([]);
         }
         
-        // Restore opacity
-        container.style.opacity = '1';
+        // Restore opacity smoothly
+        requestAnimationFrame(() => {
+            container.style.opacity = '1';
+        });
         
     } catch (error) {
         console.error('[Timeout] Error during shuffle:', error);
         
-        // Restore opacity and show fallback on error
-        container.style.opacity = '1';
+        // Restore opacity on error
+        requestAnimationFrame(() => {
+            container.style.opacity = '1';
+        });
+        
+        // Show fallback
         displayAlternativeActivities([]);
+    } finally {
+        // Reset animation state after a delay
+        _createManagedTimer(() => {
+            _pageState.animationInProgress = false;
+        }, PERFORMANCE_CONFIG.ANIMATION_DURATION + 50);
     }
 }
 
 /**
- * Sets up event listeners for the timeout page.
- * Enhanced with additional resilience features and shuffle functionality.
+ * Enhanced event listeners setup with memory management
  */
 function setupEventListeners() {
     // Handle activity item clicks for shuffling using event delegation
     const activitiesContainer = document.getElementById('alternative-activities');
     if (activitiesContainer) {
-        activitiesContainer.addEventListener('click', (event) => {
+        const clickHandler = (event) => {
             // Check if the clicked element is an activity item
             const activityItem = event.target.closest('.activity-item');
             if (activityItem) {
@@ -480,87 +592,291 @@ function setupEventListeners() {
                 event.stopPropagation();
                 shuffleMotivationalNote();
             }
-        });
+        };
         
-        // Handle keyboard events for accessibility
-        activitiesContainer.addEventListener('keydown', (event) => {
+        const keydownHandler = (event) => {
             const activityItem = event.target.closest('.activity-item');
             if (activityItem && (event.key === 'Enter' || event.key === ' ')) {
                 event.preventDefault();
                 shuffleMotivationalNote();
             }
-        });
+        };
+        
+        _addManagedEventListener(activitiesContainer, 'click', clickHandler);
+        _addManagedEventListener(activitiesContainer, 'keydown', keydownHandler);
         
         console.log('[Timeout] Activity item click and keyboard event listeners added');
     } else {
         console.warn('[Timeout] Activities container not found for event delegation');
     }
     
-    // Handle page visibility changes (user switching tabs/windows)
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Handle page visibility changes with cleanup
+    const visibilityHandler = () => handleVisibilityChange();
+    _addManagedEventListener(document, 'visibilitychange', visibilityHandler);
     
-    // Handle page focus (user coming back to this tab)
-    window.addEventListener('focus', handleVisibilityChange);
+    // Handle page focus
+    const focusHandler = () => handleVisibilityChange();
+    _addManagedEventListener(window, 'focus', focusHandler);
     
-    // Handle potential extension reload detection
-    window.addEventListener('beforeunload', () => {
-        console.log('[Timeout] Page unloading');
-    });
+    // Handle page unload with cleanup
+    const beforeUnloadHandler = () => {
+        console.log('[Timeout] Page unloading, cleaning up resources');
+        _cleanupResources();
+    };
+    _addManagedEventListener(window, 'beforeunload', beforeUnloadHandler);
     
-    // Global error handler for unhandled errors
-    window.addEventListener('error', (event) => {
+    // Enhanced global error handler
+    const errorHandler = (event) => {
         console.error('[Timeout] Unhandled error:', event.error);
         
-        // If it's an extension context error, show reload suggestion
-        if (event.error && event.error.message && 
-            event.error.message.includes('Extension context invalidated')) {
-            
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: #fef2f2;
-                border: 1px solid #fecaca;
-                color: #dc2626;
-                padding: 0.75rem 1rem;
-                border-radius: 6px;
-                font-size: 0.875rem;
-                z-index: 1000;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            `;
-            errorDiv.innerHTML = `
-                Extension reloaded. <button onclick="location.reload()" style="
-                    background: #dc2626; 
-                    color: white; 
-                    border: none; 
-                    padding: 0.25rem 0.5rem; 
-                    border-radius: 3px; 
-                    margin-left: 0.5rem; 
-                    cursor: pointer;
-                ">Refresh</button>
-            `;
-            
-            document.body.appendChild(errorDiv);
-            
-            // Auto-remove after 10 seconds
-            setTimeout(() => {
-                if (errorDiv.parentNode) {
-                    errorDiv.parentNode.removeChild(errorDiv);
-                }
-            }, 10000);
+        // Enhanced error handling based on error type
+        const error = event.error;
+        let errorInfo = ERROR_HANDLERS.DEFAULT(error);
+        
+        if (error && error.message) {
+            const message = error.message.toLowerCase();
+            if (message.includes('extension context invalidated')) {
+                errorInfo = ERROR_HANDLERS.EXTENSION_CONTEXT(error);
+            } else if (message.includes('network') || message.includes('connection')) {
+                errorInfo = ERROR_HANDLERS.NETWORK(error);
+            } else if (message.includes('storage') || message.includes('quota')) {
+                errorInfo = ERROR_HANDLERS.STORAGE(error);
+            }
         }
+        
+        // Display error notification
+        _showErrorNotification(errorInfo);
+    };
+    _addManagedEventListener(window, 'error', errorHandler);
+    
+    // Setup periodic cleanup
+    _pageState.cleanupInterval = setInterval(() => {
+        // Clean expired cache entries
+        const now = Date.now();
+        for (const [key, entry] of _pageState.cachedNotes.entries()) {
+            if (now > entry.expires) {
+                _pageState.cachedNotes.delete(key);
+            }
+        }
+        
+        // Log cache stats
+        if (_pageState.cachedNotes.size > 0) {
+            console.log(`[Timeout] Cache stats: ${_pageState.cachedNotes.size} entries`);
+        }
+    }, PERFORMANCE_CONFIG.CLEANUP_INTERVAL);
+}
+
+/**
+ * Enhanced error notification display
+ * @private
+ * @param {Object} errorInfo - Error information object
+ */
+function _showErrorNotification(errorInfo) {
+    // Remove existing error notifications
+    const existingErrors = document.querySelectorAll('.timeout-error-notification');
+    existingErrors.forEach(el => el.remove());
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'timeout-error-notification';
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: ${errorInfo.level === 'error' ? '#fef2f2' : '#fffbeb'};
+        border: 1px solid ${errorInfo.level === 'error' ? '#fecaca' : '#fed7aa'};
+        color: ${errorInfo.level === 'error' ? '#dc2626' : '#d97706'};
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    
+    const message = document.createElement('div');
+    message.textContent = errorInfo.message;
+    errorDiv.appendChild(message);
+    
+    // Add action button if retryable
+    if (errorInfo.retry) {
+        const retryBtn = document.createElement('button');
+        retryBtn.textContent = 'Retry';
+        retryBtn.style.cssText = `
+            background: ${errorInfo.level === 'error' ? '#dc2626' : '#d97706'}; 
+            color: white; 
+            border: none; 
+            padding: 0.25rem 0.5rem; 
+            border-radius: 3px; 
+            margin-left: 0.5rem; 
+            cursor: pointer;
+        `;
+        retryBtn.onclick = () => {
+            errorDiv.remove();
+            initializeTimeoutPage();
+        };
+        errorDiv.appendChild(retryBtn);
+    } else {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = 'Refresh';
+        refreshBtn.style.cssText = `
+            background: ${errorInfo.level === 'error' ? '#dc2626' : '#d97706'}; 
+            color: white; 
+            border: none; 
+            padding: 0.25rem 0.5rem; 
+            border-radius: 3px; 
+            margin-left: 0.5rem; 
+            cursor: pointer;
+        `;
+        refreshBtn.onclick = () => location.reload();
+        errorDiv.appendChild(refreshBtn);
+    }
+    
+    document.body.appendChild(errorDiv);
+    
+    // Auto-remove after 10 seconds
+    _createManagedTimer(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+        }
+    }, 10000);
+}
+
+/**
+ * Enhanced memory management for note caching
+ * @private
+ * @param {string} key - Cache key
+ * @param {Object} note - Note object to cache
+ */
+function _setCachedNote(key, note) {
+    const now = Date.now();
+    
+    // Clean up expired entries first
+    for (const [cacheKey, entry] of _pageState.cachedNotes.entries()) {
+        if (now > entry.expires) {
+            _pageState.cachedNotes.delete(cacheKey);
+        }
+    }
+    
+    // Limit cache size
+    if (_pageState.cachedNotes.size >= PERFORMANCE_CONFIG.MAX_CACHED_NOTES) {
+        const oldestKey = _pageState.cachedNotes.keys().next().value;
+        _pageState.cachedNotes.delete(oldestKey);
+    }
+    
+    // Add new entry
+    _pageState.cachedNotes.set(key, {
+        note,
+        cached: now,
+        expires: now + PERFORMANCE_CONFIG.CACHE_TTL
     });
 }
 
-// Initialize the page when the DOM is ready
+/**
+ * Retrieves cached note if available and valid
+ * @private
+ * @param {string} key - Cache key
+ * @returns {Object|null} Cached note or null
+ */
+function _getCachedNote(key) {
+    const entry = _pageState.cachedNotes.get(key);
+    if (entry && Date.now() < entry.expires) {
+        return entry.note;
+    }
+    
+    // Remove expired entry
+    if (entry) {
+        _pageState.cachedNotes.delete(key);
+    }
+    
+    return null;
+}
+
+/**
+ * Optimized timer management to prevent memory leaks
+ * @private
+ * @param {Function} callback - Timer callback
+ * @param {number} delay - Timer delay in ms
+ * @returns {number} Timer ID
+ */
+function _createManagedTimer(callback, delay) {
+    const timerId = setTimeout(() => {
+        _pageState.timers.delete(timerId);
+        callback();
+    }, delay);
+    
+    _pageState.timers.add(timerId);
+    return timerId;
+}
+
+/**
+ * Clears a managed timer
+ * @private
+ * @param {number} timerId - Timer ID to clear
+ */
+function _clearManagedTimer(timerId) {
+    clearTimeout(timerId);
+    _pageState.timers.delete(timerId);
+}
+
+/**
+ * Enhanced event listener management with cleanup tracking
+ * @private
+ * @param {Element} element - Element to attach listener to
+ * @param {string} event - Event type
+ * @param {Function} handler - Event handler
+ * @param {Object} options - Event listener options
+ */
+function _addManagedEventListener(element, event, handler, options = {}) {
+    element.addEventListener(event, handler, options);
+    _pageState.eventListeners.push({ element, event, handler, options });
+}
+
+/**
+ * Cleans up all managed resources
+ * @private
+ */
+function _cleanupResources() {
+    // Clear all timers
+    _pageState.timers.forEach(timerId => clearTimeout(timerId));
+    _pageState.timers.clear();
+    
+    // Remove all event listeners
+    _pageState.eventListeners.forEach(({ element, event, handler }) => {
+        try {
+            element.removeEventListener(event, handler);
+        } catch (error) {
+            console.warn('[Timeout] Error removing event listener:', error);
+        }
+    });
+    _pageState.eventListeners = [];
+    
+    // Clear cache
+    _pageState.cachedNotes.clear();
+    
+    // Clear cleanup interval
+    if (_pageState.cleanupInterval) {
+        clearInterval(_pageState.cleanupInterval);
+        _pageState.cleanupInterval = null;
+    }
+    
+    console.log('[Timeout] Resources cleaned up');
+}
+
+// Enhanced initialization with state management
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        setupEventListeners();
-        initializeTimeoutPage();
+        if (!_pageState.isInitialized) {
+            _pageState.isInitialized = true;
+            setupEventListeners();
+            initializeTimeoutPage();
+        }
     });
 } else {
     // DOM is already ready
-    setupEventListeners();
-    initializeTimeoutPage();
+    if (!_pageState.isInitialized) {
+        _pageState.isInitialized = true;
+        setupEventListeners();
+        initializeTimeoutPage();
+    }
 } 

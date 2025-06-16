@@ -3,15 +3,28 @@
 > A Firefox extension that helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/davidgodzsak/firefox-timelimit-extension)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/davidgodzsak/firefox-timelimit-extension)
 
 ## Features
 
+### Core Functionality
 - 🕒 **Time Monitoring**: Track time spent on specific websites
-- ⏰ **Daily Limits**: Set customizable daily time limits for distracting sites
-- 🚫 **Site Blocking**: Automatically block sites when daily limits are reached
+- ⏰ **Daily Time Limits**: Set customizable daily time limits for distracting sites
+- 📊 **Open Count Limits**: Limit the number of times you can visit a site per day (NEW in v1.1.0)
+- 🚫 **Smart Blocking**: Automatically block sites when time OR open count limits are reached
 - 📝 **Motivational Notes**: Display custom motivational messages during timeouts
-- ⚙️ **Easy Configuration**: Clean, modern settings interface
+- 🔀 **Message Shuffling**: Click shuffle icon to cycle through different motivational messages (NEW in v1.1.0)
+
+### Toolbar Integration (NEW in v1.1.0)
+- 🎯 **Popup Interface**: Click toolbar button for quick limit management
+- ⚡ **Quick Setup**: Add limits for the current page directly from the popup
+- 🏷️ **Dynamic Badge**: See remaining time/opens in the toolbar badge text
+- ⚙️ **Settings Access**: Quick access to full settings via cogwheel icon
+
+### Enhanced User Experience
+- ✏️ **Inline Editing**: Smooth inline editing in settings (no more popup alerts!)
+- 📱 **Responsive Design**: Clean, modern interface that works on all screen sizes
+- ♿ **Accessibility**: Full keyboard navigation and screen reader support
 - 📊 **Usage Statistics**: View detailed usage analytics
 - 🔄 **Daily Reset**: Automatic reset of daily usage counters
 
@@ -49,6 +62,27 @@
    ```
 
 2. This creates a `.zip` file that can be uploaded to Firefox Add-ons or installed manually.
+
+## Usage
+
+### Quick Setup (Toolbar Popup)
+1. Navigate to any website
+2. Click the Distraction Limiter icon in the toolbar
+3. Set time limit (minutes) and/or open count limit
+4. Choose from quick presets (15min/3 opens, 30min/5 opens, 1hr/10 opens)
+5. Click "Add Limits" to save
+
+### Full Settings
+1. Right-click the toolbar icon and select "Options" OR click the cogwheel in the popup
+2. Add sites with their daily time and/or open count limits
+3. Configure motivational timeout messages
+4. View usage statistics
+
+### Limit Types
+- **Time Limits**: Maximum time per day (e.g., 30 minutes)
+- **Open Count Limits**: Maximum site visits per day (e.g., 5 opens)
+- **Combined Limits**: Use both together for comprehensive control
+- **Flexible**: Each site can have time-only, opens-only, or both limit types
 
 ## Development
 
@@ -94,20 +128,34 @@ distracting-sites-limiter-firefox/
 │   ├── tab_activity_monitor.js # Tab activity tracking
 │   ├── daily_reset.js          # Daily usage reset
 │   ├── note_storage.js         # Motivational notes storage
+│   ├── badge_manager.js        # Toolbar badge text management (NEW)
 │   └── validation_utils.js     # Input validation utilities
 ├── ui/                         # User interface components
+│   ├── popup/                  # Toolbar popup interface (NEW)
+│   │   ├── popup.html          # Popup structure
+│   │   ├── popup.css           # Popup styling
+│   │   └── popup.js            # Popup functionality
 │   ├── settings/               # Settings page
-│   ├── timeout/                # Timeout/blocking page
+│   │   ├── components/         # Reusable UI components (ENHANCED)
+│   │   │   ├── inline-editor.js # Inline editing component (NEW)
+│   │   │   └── limit-form.js   # Enhanced form component (NEW)
+│   │   ├── settings.html       # Settings page structure
+│   │   ├── settings.css        # Settings styling  
+│   │   └── settings.js         # Settings functionality
+│   ├── timeout/                # Timeout/blocking page (ENHANCED)
+│   │   ├── timeout.html        # Timeout page structure
+│   │   ├── timeout.css         # Timeout styling
+│   │   └── timeout.js          # Timeout functionality + shuffle (NEW)
 │   └── common_assets/          # Shared UI assets
 ├── assets/                     # Extension assets
 │   └── icons/                  # Icon files
 ├── _locales/                   # Internationalization
 │   └── en/                     # English locale
-├── tests/                      # Test suite
+├── tests/                      # Test suite (ENHANCED)
 │   ├── unit/                   # Unit tests
-│   └── integration/            # Integration tests
+│   └── integration/            # Integration tests + new popup tests
 ├── dist/                       # Build output
-├── manifest.json               # Extension manifest
+├── manifest.json               # Extension manifest (UPDATED for toolbar)
 ├── package.json                # Node.js package configuration
 └── build.js                    # Build script
 ```
@@ -139,22 +187,31 @@ yarn test tests/unit/background_scripts/site_storage.test.js
 
 ### Test Coverage
 
-- **Background Scripts**: Complete unit test coverage for all core modules
-- **Validation**: Comprehensive validation testing for all user inputs
+- **Background Scripts**: Complete unit test coverage for all core modules including new badge manager
+- **Popup Integration**: Full testing of popup-background communication
+- **Combined Limits**: Comprehensive testing of time + open count limit scenarios
+- **Validation**: Enhanced validation testing for all user inputs including new limit types
 - **Storage**: Full CRUD operation testing for site and usage data
-- **Error Handling**: Extensive error scenario testing
+- **Error Handling**: Extensive error scenario testing including popup communication failures
+- **Performance**: Testing for badge calculation optimization and memory management
 
 ## Configuration
 
 ### Site Configuration
 
-Add sites to monitor through the extension settings:
+Add sites to monitor through multiple methods:
 
-1. Open Firefox preferences
-2. Navigate to Extensions
-3. Find "Firefox Distraction Limiter"
-4. Click "Options"
-5. Add sites with their daily time limits
+#### Toolbar Popup (Quick Method)
+1. Navigate to the site you want to limit
+2. Click the Distraction Limiter toolbar icon
+3. Set time limit (minutes) and/or open count limit
+4. Click "Add Limits"
+
+#### Full Settings Interface
+1. Open Firefox preferences → Extensions → Distraction Limiter → Options
+2. Add sites with their daily time and/or open count limits
+3. Use inline editing to modify existing limits
+4. Configure motivational timeout messages
 
 ### Supported URL Patterns
 
@@ -162,11 +219,22 @@ Add sites to monitor through the extension settings:
 - Subdomains: `mail.google.com`
 - With protocols: `https://twitter.com`
 
-### Time Limits
+### Limit Configuration
 
-- Minimum: 1 second
-- Maximum: 24 hours (86,400 seconds)
-- Format: Seconds (e.g., 3600 for 1 hour)
+#### Time Limits
+- Minimum: 1 minute
+- Maximum: 24 hours (1440 minutes)
+- Format: Minutes in popup, seconds in settings
+
+#### Open Count Limits (NEW)
+- Minimum: 1 open
+- Maximum: 100 opens per day
+- Format: Number of site visits/opens
+
+#### Combination Rules
+- Sites can have time-only, opens-only, or both limit types
+- Site is blocked when ANY limit is reached
+- Existing time-only configurations remain fully compatible
 
 ## Permissions
 
@@ -176,10 +244,11 @@ The extension requires the following permissions:
 - **alarms**: Schedule daily usage resets
 - **tabs**: Monitor active tabs for time tracking
 - **webNavigation**: Detect site navigation events
+- **activeTab**: Access current tab for popup functionality
 
 ## Browser Compatibility
 
-- Firefox 109+ (Manifest V3 support required)
+- Firefox 112+ (Manifest V3 support required)
 - Firefox Developer Edition
 - Firefox ESR (latest)
 
@@ -200,6 +269,8 @@ The extension requires the following permissions:
 - Maintain test coverage above 90%
 - Use conventional commit messages
 - Update documentation for new features
+- Test popup functionality across different screen sizes
+- Ensure accessibility compliance with ARIA labels
 
 ## License
 
@@ -214,21 +285,38 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-### v1.0.0 (Current)
+See [CHANGELOG.md](docs/CHANGELOG.md) for detailed version history.
 
-- Initial release
+### v1.1.0 (Current) - Major Feature Update
+
+#### 🆕 New Features
+- **Toolbar Integration**: Quick limit management via popup
+- **Open Count Limits**: Limit daily site visits/opens
+- **Message Shuffling**: Cycle through motivational messages
+- **Dynamic Badge Text**: See remaining limits in toolbar
+- **Inline Editing**: Smooth settings editing experience
+
+#### 🔧 Improvements  
+- Enhanced blocking logic for combined limits
+- Improved performance with badge text caching
+- Better error handling and validation
+- Accessibility improvements throughout
+- Comprehensive test coverage for new features
+
+### v1.0.0 - Initial Release
+
 - Core time limiting functionality
-- Settings interface
-- Usage tracking
-- Site blocking
+- Settings interface with time limits
+- Usage tracking and statistics
+- Site blocking with timeout page
 - Motivational timeout notes
 - Comprehensive test suite
 
 ## Known Issues
 
-1. **Array Type Validation**: Arrays pass object type checks but fail field validation (validation_utils.js)
-2. **Duplicate URL Patterns**: Site storage allows duplicate URL patterns without validation
-3. **Corrupted Storage Handling**: Poor handling of corrupted storage data in some edge cases
+1. **Badge Text Performance**: Badge calculations may slow down with many configured sites (optimizations planned)
+2. **Popup Responsiveness**: Popup may not render correctly on very small screen resolutions
+3. **Concurrent Editing**: Multiple settings tabs editing the same site simultaneously may cause conflicts
 
 ## Support
 

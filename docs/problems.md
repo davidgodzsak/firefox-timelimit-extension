@@ -1,0 +1,9 @@
+- new popup ui/ux is bad, does not follow the design of the existing app
+- new popup should show how much time was spent already, how much opens are already spent
+- new popup does not allow adding a limit easily 
+- new popup has a sun icon instead of cogwheel for settings
+- settings page does not allow setting the number of times a page can be opened.
+- settings page does not include the app icon
+- the checkmark button disappears on the settings screen when I write to the input field
+- I think switching tabs and switching back does not count as an open
+- 

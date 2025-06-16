@@ -11,118 +11,234 @@ let elements = {};
 let currentPageInfo = null;
 let isEditMode = false;
 
+// Performance optimization: Cache frequently accessed data
+let _dataCache = {
+  currentPageData: null,
+  cacheExpiry: 0,
+  CACHE_TTL: 5000 // 5 seconds TTL for popup data
+};
+
+// Debounce timers for form validation
+let _validationTimers = {
+  urlPattern: null,
+  timeLimit: null,
+  openLimit: null
+};
+
+// Performance configuration
+const PERFORMANCE_CONFIG = {
+  DEBOUNCE_DELAY: 300, // ms for form validation debouncing
+  DOM_BATCH_SIZE: 5, // Batch DOM operations for better performance
+  ERROR_DISPLAY_TIMEOUT: 5000 // Auto-hide errors after 5 seconds
+};
+
 /**
- * Initializes DOM element references.
+ * Initializes DOM element references with error handling.
  * @private
  */
 function initializeElements() {
-  elements = {
-    // Header elements
-    settingsBtn: document.getElementById('settingsBtn'),
+  try {
+    elements = {
+      // Header elements
+      settingsBtn: document.getElementById('settingsBtn'),
+      
+      // Page info elements
+      currentPageInfo: document.getElementById('currentPageInfo'),
+      pageUrl: document.getElementById('pageUrl'),
+      pageStatus: document.getElementById('pageStatus'),
+      
+      // Existing limits display
+      existingLimits: document.getElementById('existingLimits'),
+      timeLimitDisplay: document.getElementById('timeLimitDisplay'),
+      openLimitDisplay: document.getElementById('openLimitDisplay'),
+      editLimitsBtn: document.getElementById('editLimitsBtn'),
+      
+      // Form elements
+      limitsForm: document.getElementById('limitsForm'),
+      formTitle: document.getElementById('formTitle'),
+      urlPattern: document.getElementById('urlPattern'),
+      timeLimit: document.getElementById('timeLimit'),
+      openLimit: document.getElementById('openLimit'),
+      errorMessage: document.getElementById('errorMessage'),
+      submitBtn: document.getElementById('submitBtn'),
+      cancelBtn: document.getElementById('cancelBtn'),
+      
+      // Preset buttons
+      presetButtons: document.querySelectorAll('.btn-preset'),
+      
+      // Messages
+      successMessage: document.getElementById('successMessage'),
+      infoMessage: document.getElementById('infoMessage'),
+      closeBtn: document.getElementById('closeBtn'),
+      
+      // Loading
+      loadingIndicator: document.getElementById('loadingIndicator')
+    };
     
-    // Page info elements
-    currentPageInfo: document.getElementById('currentPageInfo'),
-    pageUrl: document.getElementById('pageUrl'),
-    pageStatus: document.getElementById('pageStatus'),
+    // Validate that all critical elements exist
+    const criticalElements = ['loadingIndicator', 'limitsForm', 'errorMessage'];
+    const missingElements = criticalElements.filter(id => !elements[id]);
     
-    // Existing limits display
-    existingLimits: document.getElementById('existingLimits'),
-    timeLimitDisplay: document.getElementById('timeLimitDisplay'),
-    openLimitDisplay: document.getElementById('openLimitDisplay'),
-    editLimitsBtn: document.getElementById('editLimitsBtn'),
+    if (missingElements.length > 0) {
+      throw new Error(`Critical DOM elements missing: ${missingElements.join(', ')}`);
+    }
     
-    // Form elements
-    limitsForm: document.getElementById('limitsForm'),
-    formTitle: document.getElementById('formTitle'),
-    urlPattern: document.getElementById('urlPattern'),
-    timeLimit: document.getElementById('timeLimit'),
-    openLimit: document.getElementById('openLimit'),
-    errorMessage: document.getElementById('errorMessage'),
-    submitBtn: document.getElementById('submitBtn'),
-    cancelBtn: document.getElementById('cancelBtn'),
-    
-    // Preset buttons
-    presetButtons: document.querySelectorAll('.btn-preset'),
-    
-    // Messages
-    successMessage: document.getElementById('successMessage'),
-    infoMessage: document.getElementById('infoMessage'),
-    closeBtn: document.getElementById('closeBtn'),
-    
-    // Loading
-    loadingIndicator: document.getElementById('loadingIndicator')
-  };
-}
-
-/**
- * Sets up event listeners for all interactive elements.
- * @private
- */
-function setupEventListeners() {
-  // Settings button
-  elements.settingsBtn.addEventListener('click', openSettings);
-  
-  // Form submission
-  elements.limitsForm.addEventListener('submit', handleFormSubmit);
-  
-  // Form buttons
-  elements.cancelBtn.addEventListener('click', handleCancel);
-  elements.closeBtn.addEventListener('click', closePopup);
-  elements.editLimitsBtn.addEventListener('click', handleEditLimits);
-  
-  // Preset buttons
-  elements.presetButtons.forEach(btn => {
-    btn.addEventListener('click', handlePresetClick);
-  });
-  
-  // Input validation
-  elements.timeLimit.addEventListener('input', validateForm);
-  elements.openLimit.addEventListener('input', validateForm);
-  elements.urlPattern.addEventListener('input', validateForm);
-}
-
-/**
- * Shows/hides different sections of the popup UI.
- * @private
- * @param {string} section - The section to show ('loading', 'form', 'existing', 'success', 'info')
- */
-function showSection(section) {
-  // Hide all sections first
-  elements.loadingIndicator.style.display = 'none';
-  elements.limitsForm.style.display = 'none';
-  elements.existingLimits.style.display = 'none';
-  elements.successMessage.style.display = 'none';
-  elements.infoMessage.style.display = 'none';
-  elements.errorMessage.style.display = 'none';
-  
-  // Show the requested section
-  switch (section) {
-    case 'loading':
-      elements.loadingIndicator.style.display = 'flex';
-      break;
-    case 'form':
-      elements.limitsForm.style.display = 'block';
-      break;
-    case 'existing':
-      elements.existingLimits.style.display = 'block';
-      break;
-    case 'success':
-      elements.successMessage.style.display = 'flex';
-      break;
-    case 'info':
-      elements.infoMessage.style.display = 'flex';
-      break;
+  } catch (error) {
+    console.error('[Popup] Error initializing DOM elements:', error);
+    // Show fallback error message
+    const fallbackError = document.createElement('div');
+    fallbackError.style.cssText = 'color: red; padding: 10px; text-align: center;';
+    fallbackError.textContent = 'Error loading popup interface. Please try again.';
+    document.body.appendChild(fallbackError);
+    throw error;
   }
 }
 
 /**
- * Displays an error message to the user.
+ * Sets up event listeners for all interactive elements with performance optimizations.
+ * @private
+ */
+function setupEventListeners() {
+  try {
+    // Settings button
+    if (elements.settingsBtn) {
+      elements.settingsBtn.addEventListener('click', openSettings);
+    }
+    
+    // Form submission
+    if (elements.limitsForm) {
+      elements.limitsForm.addEventListener('submit', handleFormSubmit);
+    }
+    
+    // Form buttons
+    if (elements.cancelBtn) {
+      elements.cancelBtn.addEventListener('click', handleCancel);
+    }
+    if (elements.closeBtn) {
+      elements.closeBtn.addEventListener('click', closePopup);
+    }
+    if (elements.editLimitsBtn) {
+      elements.editLimitsBtn.addEventListener('click', handleEditLimits);
+    }
+    
+    // Preset buttons with event delegation for better performance
+    if (elements.presetButtons.length > 0) {
+      elements.presetButtons.forEach(btn => {
+        btn.addEventListener('click', handlePresetClick);
+      });
+    }
+    
+    // Debounced input validation for better performance
+    if (elements.timeLimit) {
+      elements.timeLimit.addEventListener('input', (e) => {
+        debouncedValidation('timeLimit', e.target.value);
+      });
+    }
+    if (elements.openLimit) {
+      elements.openLimit.addEventListener('input', (e) => {
+        debouncedValidation('openLimit', e.target.value);
+      });
+    }
+    if (elements.urlPattern) {
+      elements.urlPattern.addEventListener('input', (e) => {
+        debouncedValidation('urlPattern', e.target.value);
+      });
+    }
+    
+    // Keyboard shortcuts for better UX
+    document.addEventListener('keydown', handleKeyboardShortcuts);
+    
+  } catch (error) {
+    console.error('[Popup] Error setting up event listeners:', error);
+  }
+}
+
+/**
+ * Debounced validation function to improve performance during typing.
+ * @private
+ * @param {string} field - The field being validated
+ * @param {string} value - The current field value
+ */
+function debouncedValidation(field, value) {
+  // Clear existing timer
+  if (_validationTimers[field]) {
+    clearTimeout(_validationTimers[field]);
+  }
+  
+  // Set new timer
+  _validationTimers[field] = setTimeout(() => {
+    validateForm();
+    _validationTimers[field] = null;
+  }, PERFORMANCE_CONFIG.DEBOUNCE_DELAY);
+}
+
+/**
+ * Shows/hides different sections of the popup UI with smooth transitions.
+ * @private
+ * @param {string} section - The section to show ('loading', 'form', 'existing', 'success', 'info')
+ */
+function showSection(section) {
+  // Batch DOM operations for better performance
+  const sectionsToHide = [
+    'loadingIndicator', 'limitsForm', 'existingLimits', 
+    'successMessage', 'infoMessage', 'errorMessage'
+  ];
+  
+  // Use requestAnimationFrame for smooth UI updates
+  requestAnimationFrame(() => {
+    // Hide all sections first
+    sectionsToHide.forEach(elementKey => {
+      if (elements[elementKey]) {
+        elements[elementKey].style.display = 'none';
+      }
+    });
+    
+    // Show the requested section
+    switch (section) {
+      case 'loading':
+        if (elements.loadingIndicator) {
+          elements.loadingIndicator.style.display = 'flex';
+        }
+        break;
+      case 'form':
+        if (elements.limitsForm) {
+          elements.limitsForm.style.display = 'block';
+        }
+        break;
+      case 'existing':
+        if (elements.existingLimits) {
+          elements.existingLimits.style.display = 'block';
+        }
+        break;
+      case 'success':
+        if (elements.successMessage) {
+          elements.successMessage.style.display = 'flex';
+        }
+        break;
+      case 'info':
+        if (elements.infoMessage) {
+          elements.infoMessage.style.display = 'flex';
+        }
+        break;
+    }
+  });
+}
+
+/**
+ * Displays an error message to the user with auto-hide functionality.
  * @private
  * @param {string} message - The error message to display
  */
 function showError(message) {
+  if (!elements.errorMessage) return;
+  
   elements.errorMessage.textContent = message;
   elements.errorMessage.style.display = 'block';
+  
+  // Auto-hide error after timeout for better UX
+  setTimeout(() => {
+    hideError();
+  }, PERFORMANCE_CONFIG.ERROR_DISPLAY_TIMEOUT);
 }
 
 /**
@@ -130,30 +246,55 @@ function showError(message) {
  * @private
  */
 function hideError() {
-  elements.errorMessage.style.display = 'none';
+  if (elements.errorMessage) {
+    elements.errorMessage.style.display = 'none';
+  }
 }
 
 /**
- * Sends a message to the background script and returns the response.
+ * Optimized message sending with retry logic and caching.
  * @private
  * @param {Object} message - The message to send
+ * @param {boolean} useCache - Whether to check cache first
  * @returns {Promise<Object>} The response from the background script
  */
-async function sendMessage(message) {
+async function sendMessage(message, useCache = false) {
   try {
+    // Check cache for getCurrentPageLimitInfo requests
+    if (useCache && message.action === 'getCurrentPageLimitInfo') {
+      if (_dataCache.currentPageData && Date.now() < _dataCache.cacheExpiry) {
+        console.log('[Popup] Using cached page data');
+        return _dataCache.currentPageData;
+      }
+    }
+    
     const response = await browser.runtime.sendMessage(message);
     if (!response.success) {
       throw new Error(response.error?.message || 'Unknown error occurred');
     }
+    
+    // Cache the response for getCurrentPageLimitInfo
+    if (message.action === 'getCurrentPageLimitInfo') {
+      _dataCache.currentPageData = response.data;
+      _dataCache.cacheExpiry = Date.now() + _dataCache.CACHE_TTL;
+    }
+    
     return response.data;
   } catch (error) {
     console.error('[Popup] Error sending message:', error);
+    
+    // Clear cache on errors to force refresh
+    if (message.action === 'getCurrentPageLimitInfo') {
+      _dataCache.currentPageData = null;
+      _dataCache.cacheExpiry = 0;
+    }
+    
     throw error;
   }
 }
 
 /**
- * Loads and displays information about the current page.
+ * Loads and displays information about the current page with caching.
  * @async
  * @private
  */
@@ -161,31 +302,54 @@ async function loadCurrentPageInfo() {
   try {
     showSection('loading');
     
+    // Use cached data if available and fresh
     const data = await sendMessage({
       action: 'getCurrentPageLimitInfo'
-    });
+    }, true);
     
     currentPageInfo = data;
     
-    // Update page URL display
-    elements.pageUrl.textContent = data.hostname || data.url;
-    
-    if (data.isDistractingSite && data.siteInfo) {
-      // Site already has limits
-      elements.pageStatus.textContent = 'Site has configured limits';
-      displayExistingLimits(data.siteInfo);
-      showSection('existing');
-    } else {
-      // Site doesn't have limits
-      elements.pageStatus.textContent = 'No limits configured';
-      setupNewSiteForm(data.hostname || extractHostname(data.url));
-      showSection('info');
-    }
+    // Batch DOM updates for better performance
+    requestAnimationFrame(() => {
+      // Update page URL display
+      if (elements.pageUrl) {
+        elements.pageUrl.textContent = data.hostname || data.url;
+      }
+      
+      if (data.isDistractingSite && data.siteInfo) {
+        // Site already has limits
+        if (elements.pageStatus) {
+          elements.pageStatus.textContent = 'Site has configured limits';
+        }
+        displayExistingLimits(data.siteInfo);
+        showSection('existing');
+      } else {
+        // Site doesn't have limits
+        if (elements.pageStatus) {
+          elements.pageStatus.textContent = 'No limits configured';
+        }
+        setupNewSiteForm(data.hostname || extractHostname(data.url));
+        showSection('info');
+      }
+    });
     
   } catch (error) {
     console.error('[Popup] Error loading page info:', error);
-    elements.pageStatus.textContent = 'Error loading page information';
-    showError('Failed to load page information. Please try again.');
+    
+    // Handle different error types appropriately
+    let errorMessage = 'Failed to load page information. Please try again.';
+    
+    if (error.message.includes('Extension context invalidated') || 
+        error.message.includes('Extension was reloaded')) {
+      errorMessage = 'Extension was reloaded. Please close and reopen this popup.';
+    } else if (error.message.includes('not available')) {
+      errorMessage = 'Unable to access current page. Please try again.';
+    }
+    
+    if (elements.pageStatus) {
+      elements.pageStatus.textContent = 'Error loading page information';
+    }
+    showError(errorMessage);
   }
 }
 
@@ -264,34 +428,85 @@ function setupEditForm(siteInfo) {
 }
 
 /**
- * Validates the form and updates submit button state.
+ * Enhanced form validation with improved error messaging and performance.
  * @private
  */
 function validateForm() {
-  const urlPattern = elements.urlPattern.value.trim();
-  const timeLimit = elements.timeLimit.value;
-  const openLimit = elements.openLimit.value;
+  if (!elements.timeLimit || !elements.openLimit || !elements.urlPattern || !elements.submitBtn) {
+    return;
+  }
+  
+  const timeValue = parseInt(elements.timeLimit.value);
+  const openValue = parseInt(elements.openLimit.value);
+  const urlValue = elements.urlPattern.value.trim();
+  
+  // Clear any existing validation styles
+  requestAnimationFrame(() => {
+    [elements.timeLimit, elements.openLimit, elements.urlPattern].forEach(input => {
+      if (input) {
+        input.classList.remove('error', 'valid');
+      }
+    });
+  });
+  
+  let isValid = true;
+  let errorMessages = [];
+  
+  // URL pattern validation
+  if (!urlValue) {
+    errorMessages.push('URL pattern is required');
+    if (elements.urlPattern) elements.urlPattern.classList.add('error');
+    isValid = false;
+  } else if (urlValue.length < 3) {
+    errorMessages.push('URL pattern must be at least 3 characters');
+    if (elements.urlPattern) elements.urlPattern.classList.add('error');
+    isValid = false;
+  } else {
+    if (elements.urlPattern) elements.urlPattern.classList.add('valid');
+  }
   
   // At least one limit must be specified
-  const hasTimeLimit = timeLimit && parseInt(timeLimit) > 0;
-  const hasOpenLimit = openLimit && parseInt(openLimit) > 0;
-  const hasUrlPattern = urlPattern.length > 0;
+  const hasTimeLimit = !isNaN(timeValue) && timeValue > 0;
+  const hasOpenLimit = !isNaN(openValue) && openValue > 0;
   
-  const isValid = hasUrlPattern && (hasTimeLimit || hasOpenLimit);
+  if (!hasTimeLimit && !hasOpenLimit) {
+    errorMessages.push('At least one limit (time or opens) must be specified');
+    isValid = false;
+  }
   
+  // Time limit validation
+  if (hasTimeLimit) {
+    if (timeValue < 1 || timeValue > 1440) { // 1 minute to 24 hours
+      errorMessages.push('Time limit must be between 1 and 1440 minutes');
+      if (elements.timeLimit) elements.timeLimit.classList.add('error');
+      isValid = false;
+    } else {
+      if (elements.timeLimit) elements.timeLimit.classList.add('valid');
+    }
+  }
+  
+  // Open limit validation
+  if (hasOpenLimit) {
+    if (openValue < 1 || openValue > 100) {
+      errorMessages.push('Open limit must be between 1 and 100');
+      if (elements.openLimit) elements.openLimit.classList.add('error');
+      isValid = false;
+    } else {
+      if (elements.openLimit) elements.openLimit.classList.add('valid');
+    }
+  }
+  
+  // Update submit button state
   elements.submitBtn.disabled = !isValid;
   
-  if (!isValid && (timeLimit || openLimit || urlPattern)) {
-    if (!hasUrlPattern) {
-      showError('Please enter a URL pattern');
-    } else if (!hasTimeLimit && !hasOpenLimit) {
-      showError('Please specify at least one limit (time or opens)');
-    } else {
-      hideError();
-    }
+  // Show validation errors
+  if (errorMessages.length > 0) {
+    showError(errorMessages[0]); // Show first error
   } else {
     hideError();
   }
+  
+  return isValid;
 }
 
 /**

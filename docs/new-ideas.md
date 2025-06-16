@@ -1,5 +1,5 @@
 - On the timout page, next to the motivational message show a shuffle icon, and when the user clicks on it it should change the motivational message and show another random one.
-- Add a button with an icon next to the search bar, when the user clicks on it, they can add a time limit to the page being open
-- Add limit on number of opens. So let user limit how many times a page can be open. Entering a page as entering an open tabs should count as an open. 
-- The plugin should show a textbox next to the icon next to the searchbar with how many opens are left and how many minutes are left
-- 
+- Add a button with the icon to the toolbar, when the user clicks on it, they see a popup and can add a time limit to the page being open in that popup, also the popup should have a cogwheel icon, when clicking on it the app should take us to the settings page.
+- Add limit on number of opens. So let user limit how many times a page can be open. Entering a page as entering an open tabs should count as an open. This should work seamlessly with the time limit, extend the functionality.
+- The plugin should show a text next to the icon in the toolbar showing how many opens are left and how many minutes are left (only the ones that apply, and only on sites where a rule is set, otherwise just show the icon to add new ones)
+- refactor the settings page modify time limit: currently it shows an html alert popup to enter the new date, make this better UX by changing the text box that displays the current settings to an input and a save button when the user clicks on the edit icon. when the save button is clicked, it should turn back to a text field with the new stored value.

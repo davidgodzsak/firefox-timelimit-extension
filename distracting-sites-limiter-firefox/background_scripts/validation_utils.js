@@ -31,7 +31,8 @@ const STORAGE_LIMITS = {
   MAX_NOTES: 1000,
   MAX_URL_LENGTH: 2000,
   MAX_NOTE_LENGTH: 1000,
-  MAX_DAILY_LIMIT_SECONDS: 86400 // 24 hours
+  MAX_DAILY_LIMIT_SECONDS: 86400, // 24 hours
+  MAX_DAILY_OPEN_LIMIT: 1000 // Maximum opens per day
 };
 
 /**
@@ -393,5 +394,143 @@ export function validateRequiredFields(obj, requiredFields) {
     isValid: true,
     error: null,
     missingField: null
+  };
+}
+
+/**
+ * Validates a daily open count limit.
+ * 
+ * @param {number} limitOpens - The open count limit to validate
+ * @returns {Object} Validation result
+ * @returns {boolean} returns.isValid - Whether the limit is valid
+ * @returns {string} returns.error - Error message if invalid
+ */
+export function validateDailyOpenLimit(limitOpens) {
+  if (typeof limitOpens !== 'number' || isNaN(limitOpens)) {
+    return {
+      isValid: false,
+      error: 'Open limit must be a valid number'
+    };
+  }
+
+  if (limitOpens <= 0) {
+    return {
+      isValid: false,
+      error: 'Open limit must be greater than 0'
+    };
+  }
+
+  if (limitOpens > STORAGE_LIMITS.MAX_DAILY_OPEN_LIMIT) {
+    return {
+      isValid: false,
+      error: `Open limit cannot exceed ${STORAGE_LIMITS.MAX_DAILY_OPEN_LIMIT} opens per day`
+    };
+  }
+
+  // Check for reasonable limits (warn if very high)
+  if (limitOpens > 100) {
+    console.warn('[ValidationUtils] High open limit detected:', limitOpens);
+  }
+
+  return {
+    isValid: true,
+    error: null
+  };
+}
+
+/**
+ * Validates a site object with both time and open limits.
+ * Enhanced validation for the new combined limit features.
+ * 
+ * @param {Object} site - The site object to validate
+ * @returns {Object} Validation result
+ * @returns {boolean} returns.isValid - Whether the site object is valid
+ * @returns {string} returns.error - Error message if invalid
+ * @returns {Object} returns.sanitizedSite - Sanitized site object if valid
+ */
+export function validateSiteObject(site) {
+  if (!site || typeof site !== 'object') {
+    return {
+      isValid: false,
+      error: 'Site must be an object',
+      sanitizedSite: null
+    };
+  }
+
+  // Validate required fields
+  const requiredFieldsCheck = validateRequiredFields(site, ['urlPattern', 'isEnabled']);
+  if (!requiredFieldsCheck.isValid) {
+    return {
+      isValid: false,
+      error: requiredFieldsCheck.error,
+      sanitizedSite: null
+    };
+  }
+
+  // Validate URL pattern
+  const urlValidation = validateUrlPattern(site.urlPattern);
+  if (!urlValidation.isValid) {
+    return {
+      isValid: false,
+      error: urlValidation.error,
+      sanitizedSite: null
+    };
+  }
+
+  // At least one limit must be specified
+  const hasTimeLimit = site.dailyLimitSeconds && site.dailyLimitSeconds > 0;
+  const hasOpenLimit = site.dailyOpenLimit && site.dailyOpenLimit > 0;
+
+  if (!hasTimeLimit && !hasOpenLimit) {
+    return {
+      isValid: false,
+      error: 'At least one limit (time or opens) must be specified',
+      sanitizedSite: null
+    };
+  }
+
+  // Validate time limit if present
+  if (hasTimeLimit) {
+    const timeLimitValidation = validateDailyTimeLimit(site.dailyLimitSeconds);
+    if (!timeLimitValidation.isValid) {
+      return {
+        isValid: false,
+        error: timeLimitValidation.error,
+        sanitizedSite: null
+      };
+    }
+  }
+
+  // Validate open limit if present
+  if (hasOpenLimit) {
+    const openLimitValidation = validateDailyOpenLimit(site.dailyOpenLimit);
+    if (!openLimitValidation.isValid) {
+      return {
+        isValid: false,
+        error: openLimitValidation.error,
+        sanitizedSite: null
+      };
+    }
+  }
+
+  // Create sanitized site object
+  const sanitizedSite = {
+    id: site.id,
+    urlPattern: urlValidation.normalizedPattern,
+    isEnabled: Boolean(site.isEnabled)
+  };
+
+  // Add limits only if they're valid
+  if (hasTimeLimit) {
+    sanitizedSite.dailyLimitSeconds = site.dailyLimitSeconds;
+  }
+  if (hasOpenLimit) {
+    sanitizedSite.dailyOpenLimit = site.dailyOpenLimit;
+  }
+
+  return {
+    isValid: true,
+    error: null,
+    sanitizedSite: sanitizedSite
   };
 } 
