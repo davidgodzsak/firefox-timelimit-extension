@@ -1,17 +1,18 @@
 /**
  * @file usage_recorder.js
  * @description Handles the recording of time spent and open counts for distracting sites.
- * It manages timers for periodic updates and interacts with storage to persist usage data.
+ * This module is now stateless and event-driven, using browser.storage.session for
+ * tracking state and browser.alarms for timing. Compatible with Manifest V3.
  */
 
 import { getUsageStats, updateUsageStats } from './usage_storage.js';
 
-const TRACKING_RESOLUTION_MS = 5000; // How often to record time spent, in milliseconds.
-
-let _currentTrackingState = {
-  siteId: null,       // ID of the site currently being tracked
-  startTime: null,    // Timestamp (ms) when tracking for the current slice started
-  intervalId: null,   // ID for the setInterval timer for periodic updates
+// Session storage keys for tracking state
+const SESSION_KEYS = {
+  SITE_ID: 'tracking_siteId',
+  START_TIME: 'tracking_startTime',
+  TAB_ID: 'tracking_tabId',
+  IS_ACTIVE: 'tracking_isActive'
 };
 
 /**
@@ -29,7 +30,6 @@ function _getCurrentDateString() {
 
 /**
  * Updates usage statistics in storage for a given site.
- * Assumes `getUsageStats` and `updateUsageStats` are available from `storage_manager.js`.
  * @private
  * @param {string} siteId - The ID of the distracting site.
  * @param {number} timeIncrementSeconds - The amount of time (in seconds) to add. Can be 0.
@@ -40,6 +40,7 @@ async function _updateUsageStatsInStorage(siteId, timeIncrementSeconds, isNewOpe
     console.warn('[UsageRecorder] Attempted to update usage stats with no siteId.');
     return;
   }
+  
   const dateString = _getCurrentDateString();
   let siteStats = { timeSpentSeconds: 0, opens: 0 };
 
@@ -62,111 +63,243 @@ async function _updateUsageStatsInStorage(siteId, timeIncrementSeconds, isNewOpe
     console.log(`[UsageRecorder] Updating usage: Date: ${dateString}, Site: ${siteId}, Spent: ${siteStats.timeSpentSeconds}s, Opens: ${siteStats.opens}`);
     await updateUsageStats(dateString, siteId, siteStats);
     
-    // Trigger badge refresh after usage update
-    try {
-      // Import badge manager dynamically to avoid circular dependencies
-      const badgeManager = await import('./badge_manager.js');
-      await badgeManager.refreshCurrentTabBadge();
-    } catch (error) {
-      console.warn('[UsageRecorder] Could not refresh badge after usage update:', error);
-      // Continue without badge refresh - non-critical
-    }
+    return siteStats.timeSpentSeconds; // Return current total time for badge updates
     
   } catch (error) {
     console.error(`[UsageRecorder] Error updating usage stats for site ${siteId} on ${dateString}:`, error);
+    throw error; // Re-throw error to be handled by caller
   }
 }
 
 /**
- * Records the currently accumulated time slice for the active distracting site.
- * This is called periodically by the timer.
+ * Gets the current tracking state from session storage.
+ * @private
+ * @returns {Promise<Object>} The tracking state object.
+ */
+async function _getTrackingState() {
+  try {
+    const result = await browser.storage.session.get([
+      SESSION_KEYS.SITE_ID,
+      SESSION_KEYS.START_TIME,
+      SESSION_KEYS.TAB_ID,
+      SESSION_KEYS.IS_ACTIVE
+    ]);
+    
+    return {
+      siteId: result[SESSION_KEYS.SITE_ID] || null,
+      startTime: result[SESSION_KEYS.START_TIME] || null,
+      tabId: result[SESSION_KEYS.TAB_ID] || null,
+      isActive: result[SESSION_KEYS.IS_ACTIVE] || false
+    };
+  } catch (error) {
+    console.error('[UsageRecorder] Error getting tracking state:', error);
+    return { siteId: null, startTime: null, tabId: null, isActive: false };
+  }
+}
+
+/**
+ * Sets the tracking state in session storage.
+ * @private
+ * @param {Object} state - The state to set.
+ */
+async function _setTrackingState(state) {
+  try {
+    const storageData = {};
+    if (state.siteId !== undefined) storageData[SESSION_KEYS.SITE_ID] = state.siteId;
+    if (state.startTime !== undefined) storageData[SESSION_KEYS.START_TIME] = state.startTime;
+    if (state.tabId !== undefined) storageData[SESSION_KEYS.TAB_ID] = state.tabId;
+    if (state.isActive !== undefined) storageData[SESSION_KEYS.IS_ACTIVE] = state.isActive;
+    
+    await browser.storage.session.set(storageData);
+  } catch (error) {
+    console.error('[UsageRecorder] Error setting tracking state:', error);
+    throw error; // Re-throw so callers can handle appropriately
+  }
+}
+
+/**
+ * Clears the tracking state from session storage.
  * @private
  */
-async function _recordCurrentTimeSlice() {
-  if (_currentTrackingState.siteId && _currentTrackingState.startTime) {
-    const elapsedMs = Date.now() - _currentTrackingState.startTime;
-    if (elapsedMs > 0) {
-      await _updateUsageStatsInStorage(_currentTrackingState.siteId, elapsedMs / 1000, false);
-    }
-    // Reset start time for the next interval, continuing tracking the same siteId.
-    _currentTrackingState.startTime = Date.now();
-  } else {
-    // This case should ideally not be hit if a timer is active, but good for safety.
-    console.warn('[UsageRecorder] _recordCurrentTimeSlice called without active tracking state.');
-    await stopTrackingSiteTime(); // Stop timer if it's somehow running without state
+async function _clearTrackingState() {
+  try {
+    await browser.storage.session.remove([
+      SESSION_KEYS.SITE_ID,
+      SESSION_KEYS.START_TIME,
+      SESSION_KEYS.TAB_ID,
+      SESSION_KEYS.IS_ACTIVE
+    ]);
+  } catch (error) {
+    console.warn('[UsageRecorder] Error clearing tracking state (continuing):', error);
+    // Don't throw - this is cleanup and should be non-blocking
   }
 }
 
 /**
- * Initializes the usage recorder module.
- * Currently, this is a placeholder for any future setup, but the module is mostly reactive.
- */
-export function initializeUsageRecorder() {
-  console.log('[UsageRecorder] Initialized.');
-  // Any future one-time setup for the recorder can go here.
-}
-
-/**
- * Starts tracking time for a specific distracting site.
- * If already tracking a site, it will stop the previous and start the new one.
+ * Starts tracking time for a specific distracting site and tab.
+ * Stores the tracking state in session storage for persistence across extension restarts.
+ * @param {number} tabId - The ID of the tab where the distracting site is open.
  * @param {string} siteId - The ID of the distracting site to start tracking.
+ * @returns {Promise<boolean>} True if tracking was started successfully, false otherwise.
  */
-export async function startTrackingSiteTime(siteId) {
-  if (!siteId) {
-    console.warn('[UsageRecorder] Attempted to start tracking without a siteId.');
-    return;
+export async function startTracking(tabId, siteId) {
+  if (!tabId || !siteId) {
+    console.warn('[UsageRecorder] Attempted to start tracking without valid tabId and siteId:', { tabId, siteId });
+    return false;
   }
 
-  // If currently tracking something else, or even the same site (to reset timer logic), stop it first.
-  if (_currentTrackingState.intervalId) {
-    await stopTrackingSiteTime();
-  }
+  try {
+    // If already tracking something, stop it first to record any accumulated time
+    const currentState = await _getTrackingState();
+    if (currentState.isActive) {
+      console.log('[UsageRecorder] Stopping previous tracking before starting new session');
+      await stopTracking();
+    }
 
-  _currentTrackingState.siteId = siteId;
-  _currentTrackingState.startTime = Date.now(); // Set start time for the new tracking period
+    const startTime = Date.now();
+    await _setTrackingState({
+      siteId,
+      startTime,
+      tabId,
+      isActive: true
+    });
 
-  if (!_currentTrackingState.intervalId) {
-    _currentTrackingState.intervalId = setInterval(_recordCurrentTimeSlice, TRACKING_RESOLUTION_MS);
-    console.log(`[UsageRecorder] Started periodic time recording for site: ${siteId}.`);
+    console.log(`[UsageRecorder] Started tracking site: ${siteId} in tab: ${tabId}`);
+    
+    // Record the site open event
+    await _updateUsageStatsInStorage(siteId, 0, true);
+    
+    return true;
+  } catch (error) {
+    console.error('[UsageRecorder] Error starting tracking:', error);
+    return false;
   }
 }
 
 /**
  * Stops tracking time for the currently active site.
- * Records any final accumulated time before stopping.
+ * Records any final accumulated time and clears the tracking state.
+ * @returns {Promise<number>} The total time spent on the site (in seconds) or 0 if no tracking was active.
  */
-export async function stopTrackingSiteTime() {
-  if (_currentTrackingState.intervalId) {
-    clearInterval(_currentTrackingState.intervalId);
-    _currentTrackingState.intervalId = null;
-    console.log(`[UsageRecorder] Stopped periodic time recording for site: ${_currentTrackingState.siteId}.`);
-  }
-
-  // Record any final time slice if tracking was active for a site.
-  if (_currentTrackingState.siteId && _currentTrackingState.startTime) {
-    const elapsedMs = Date.now() - _currentTrackingState.startTime;
-    if (elapsedMs > 0) {
-      console.log(`[UsageRecorder] Recording final time slice of ${elapsedMs / 1000}s for site ${_currentTrackingState.siteId}.`);
-      await _updateUsageStatsInStorage(_currentTrackingState.siteId, elapsedMs / 1000, false);
+export async function stopTracking() {
+  try {
+    const state = await _getTrackingState();
+    
+    if (!state.isActive || !state.siteId || !state.startTime) {
+      console.log('[UsageRecorder] No active tracking to stop');
+      await _clearTrackingState(); // Clean up any partial state
+      return 0;
     }
+
+    // Calculate final time slice
+    const elapsedMs = Date.now() - state.startTime;
+    let totalTimeSeconds = 0;
+    
+    if (elapsedMs > 0) {
+      console.log(`[UsageRecorder] Recording final time slice of ${elapsedMs / 1000}s for site ${state.siteId}`);
+      try {
+        totalTimeSeconds = await _updateUsageStatsInStorage(state.siteId, elapsedMs / 1000, false);
+      } catch (updateError) {
+        console.warn('[UsageRecorder] Error updating final time slice, continuing with cleanup:', updateError);
+        // Continue with cleanup even if update fails
+      }
+    }
+
+    // Clear tracking state
+    await _clearTrackingState();
+    console.log(`[UsageRecorder] Stopped tracking site: ${state.siteId}`);
+    
+    return totalTimeSeconds;
+  } catch (error) {
+    console.error('[UsageRecorder] Error stopping tracking:', error);
+    await _clearTrackingState(); // Ensure state is cleared even on error
+    return 0;
   }
-  
-  // Reset tracking state
-  _currentTrackingState.siteId = null;
-  _currentTrackingState.startTime = null;
 }
 
 /**
- * Records an "open" event for a distracting site.
+ * Updates usage for the currently tracked site (called by alarm).
+ * This function is called periodically to record incremental time slices
+ * while maintaining the tracking session.
+ * @returns {Promise<number>} The total time spent on the site (in seconds) or 0 if no tracking is active.
+ */
+export async function updateUsage() {
+  try {
+    const state = await _getTrackingState();
+    
+    if (!state.isActive || !state.siteId || !state.startTime) {
+      console.log('[UsageRecorder] updateUsage called but no active tracking found');
+      return 0;
+    }
+
+    // Calculate time since last update
+    const elapsedMs = Date.now() - state.startTime;
+    let totalTimeSeconds = 0;
+    
+    if (elapsedMs > 0) {
+      console.log(`[UsageRecorder] Recording periodic time slice of ${elapsedMs / 1000}s for site ${state.siteId}`);
+      try {
+        totalTimeSeconds = await _updateUsageStatsInStorage(state.siteId, elapsedMs / 1000, false);
+        
+        // Reset start time for next interval, continuing to track the same site
+        try {
+          await _setTrackingState({
+            startTime: Date.now()
+          });
+        } catch (stateError) {
+          console.warn('[UsageRecorder] Error resetting start time, will continue tracking:', stateError);
+          // Don't fail the entire operation if we can't update the start time
+        }
+      } catch (updateError) {
+        console.warn('[UsageRecorder] Error updating periodic time slice:', updateError);
+        // Don't reset start time if update failed - will retry on next alarm
+      }
+    }
+    
+    return totalTimeSeconds;
+  } catch (error) {
+    console.error('[UsageRecorder] Error updating usage:', error);
+    return 0;
+  }
+}
+
+/**
+ * Gets the current tracking information.
+ * @returns {Promise<Object>} Object with current tracking state.
+ */
+export async function getCurrentTrackingInfo() {
+  try {
+    const state = await _getTrackingState();
+    return {
+      isTracking: state.isActive,
+      siteId: state.siteId,
+      tabId: state.tabId,
+      startTime: state.startTime
+    };
+  } catch (error) {
+    console.error('[UsageRecorder] Error getting current tracking info:', error);
+    return { isTracking: false, siteId: null, tabId: null, startTime: null };
+  }
+}
+
+/**
+ * Records an "open" event for a distracting site without starting time tracking.
+ * This is used when a site is opened but time tracking isn't started immediately.
  * @param {string} siteId - The ID of the distracting site that was opened.
+ * @returns {Promise<boolean>} True if the open was recorded successfully, false otherwise.
  */
 export async function recordSiteOpen(siteId) {
   if (!siteId) {
     console.warn('[UsageRecorder] Attempted to record site open without a siteId.');
-    return;
+    return false;
   }
-  console.log(`[UsageRecorder] Recording site open for: ${siteId}`);
-  await _updateUsageStatsInStorage(siteId, 0, true); // 0 time, but increment open count
-}
-
-// Assume functions will be callable by time_tracker.js orchestrator. 
+  
+  try {
+    console.log(`[UsageRecorder] Recording site open for: ${siteId}`);
+    const result = await _updateUsageStatsInStorage(siteId, 0, true); // 0 time, but increment open count
+    return result !== undefined; // _updateUsageStatsInStorage returns time or 0, so check if it succeeded
+  } catch (error) {
+    console.error('[UsageRecorder] Error recording site open:', error);
+    return false;
+  }
+} 
