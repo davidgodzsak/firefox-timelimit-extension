@@ -1,9 +1,14 @@
-- new popup ui/ux is bad, does not follow the design of the existing app
-- new popup should show how much time was spent already, how much opens are already spent
-- new popup does not allow adding a limit easily 
-- new popup has a sun icon instead of cogwheel for settings
-- settings page does not allow setting the number of times a page can be opened.
-- settings page does not include the app icon
-- the checkmark button disappears on the settings screen when I write to the input field
-- I think switching tabs and switching back does not count as an open
-- 
+- the popup does not contain any input for adding a new site limit when opening a site that never had a limit set up
+- the popup button is not following the same design as the buttons in the settings page (edit, delete buttons don't use the icons).
+- popup should not show edit or delete limits buttons, it makes it too easy to make changes and a user could use this to avoid the limits.
+- popup settings button is a sun icon not a cogwheel icon
+- the popup shows a progress bar in th
+- time limit page has a bug: Uncaught SyntaxError: import declarations may only appear at top level of a module in the logs
+- settings page input is marked with red border as if it had a validation error, even before touching the field.
+- on the settings page, the distracting site entries have buttons for edit and delete, but these don't match the edit and delete buttons of the motivational notes entries, the ones in the motivational notes are preferred.
+- settings page add note button is not inline with the input field for the suggestion.
+- settings page site entry enabled/disabled indicator should be inline with the site name, and it should only be a badge, now it fills the whole width of the row.
+- settings page enabled/disabled indicator does not have a good contrast with the background, it's barely visible.
+- popup page has a progress bar for both limitations (time, open) but the progress bar is not updated, it does not show how much was used of the allowed time/opens
+- after changing a site's limit to a higher number the site is still blocked not shown again. 
+- background script goes idle. Solution: https://stackoverflow.com/questions/66618136/persistent-service-worker-in-chrome-extension, https://discourse.mozilla.org/t/impossible-to-upgrade-to-manifest-v3-for-extensions-that-require-constant-persistent-listeners/125942/17
