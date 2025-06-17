@@ -17,6 +17,7 @@ import { initializeDailyResetAlarm, performDailyReset } from './daily_reset.js';
 import { handlePotentialRedirect } from './site_blocker.js';
 import { startTracking, stopTracking, updateUsage, getCurrentTrackingInfo } from './usage_recorder.js';
 import { checkIfUrlIsDistracting, initializeDistractionDetector } from './distraction_detector.js';
+import { updateBadge } from './badge_manager.js';
 
 /**
  * Handles the extension installation or startup.
@@ -68,9 +69,7 @@ async function handleAlarm(alarm) {
         try {
           const trackingInfo = await getCurrentTrackingInfo();
           if (trackingInfo.isTracking && trackingInfo.tabId) {
-            // Import badge manager dynamically to avoid circular dependencies
-            const badgeManager = await import('./badge_manager.js');
-            await badgeManager.updateBadge(trackingInfo.tabId);
+            await updateBadge(trackingInfo.tabId);
           }
         } catch (error) {
           console.warn('[Background] Error updating badge after usage alarm:', error);
@@ -141,6 +140,13 @@ async function handleTabActivated(activeInfo) {
     // Get the tab details
     const tab = await browser.tabs.get(tabId);
     await handleTabActivity(tabId, tab.url, true);
+    
+    // Update badge for the newly activated tab
+    try {
+      await updateBadge(tabId);
+    } catch (error) {
+      console.warn('[Background] Error updating badge after tab activation:', error);
+    }
   } catch (error) {
     console.error(`[Background] Error handling tab activation for tab ${tabId}:`, error);
   }
@@ -177,6 +183,15 @@ async function handleTabUpdated(tabId, changeInfo, tab) {
     
     const shouldTrack = isActiveTab && isWindowFocused;
     await handleTabActivity(tabId, newUrl, shouldTrack);
+    
+    // Update badge when navigation is complete for active tab
+    if (isActiveTab && changeInfo.status === 'complete') {
+      try {
+        await updateBadge(tabId);
+      } catch (error) {
+        console.warn('[Background] Error updating badge after tab navigation complete:', error);
+      }
+    }
   } catch (error) {
     console.error(`[Background] Error handling tab update for tab ${tabId}:`, error);
   }
@@ -250,8 +265,7 @@ async function handleTabActivity(tabId, url, shouldTrack) {
           
           // Update badge immediately
           try {
-            const badgeManager = await import('./badge_manager.js');
-            await badgeManager.updateBadge(tabId);
+            await updateBadge(tabId);
           } catch (error) {
             console.warn('[Background] Error updating badge after starting tracking:', error);
           }

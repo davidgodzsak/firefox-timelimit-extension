@@ -113,15 +113,19 @@ describe('Performance and Error Handling Integration', () => {
       
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
+      // Mock a tab for the new API
+      global.browser.tabs.get.mockResolvedValue({
+        id: 1,
+        url: 'https://example.com'
+      });
+
       // Should not throw error, should handle gracefully
-      await expect(badgeManager.updateBadgeForTab(1, 'https://example.com')).resolves.not.toThrow();
-      
-      jest.runAllTimers();
+      await expect(badgeManager.updateBadge(1)).resolves.not.toThrow();
 
       // The badge manager should handle the error gracefully without crashing
       // Specific error logging patterns may vary, so we just check it didn't throw
-      expect(badgeManager.updateBadgeForTab).toBeDefined();
-      expect(badgeManager.clearAllBadges).toBeDefined();
+      expect(badgeManager.updateBadge).toBeDefined();
+      expect(badgeManager.clearBadge).toBeDefined();
 
       consoleSpy.mockRestore();
     });
@@ -159,7 +163,7 @@ describe('Performance and Error Handling Integration', () => {
       
       // Should load without errors and handle network issues gracefully
       expect(badgeManager).toBeDefined();
-      expect(badgeManager.updateBadgeForTab).toBeDefined();
+      expect(badgeManager.updateBadge).toBeDefined();
     });
 
     test('should recover from temporary API failures', async () => {
@@ -205,10 +209,16 @@ describe('Performance and Error Handling Integration', () => {
 
       const badgeManager = await import('../../background_scripts/badge_manager.js');
 
+      // Mock tabs for the new API
+      global.browser.tabs.get.mockImplementation(async (tabId) => ({
+        id: tabId,
+        url: `https://example${tabId}.com`
+      }));
+
       // Simulate rapid badge updates
       const promises = [];
       for (let i = 0; i < 100; i++) {
-        promises.push(badgeManager.updateBadgeForTab(i, `https://example${i}.com`));
+        promises.push(badgeManager.updateBadge(i));
       }
 
       await Promise.allSettled(promises);
@@ -261,10 +271,16 @@ describe('Performance and Error Handling Integration', () => {
         siteId: null
       });
 
+      // Mock tabs for the new API
+      global.browser.tabs.get.mockImplementation(async (tabId) => ({
+        id: tabId,
+        url: `https://example${tabId}.com`
+      }));
+
       // Simulate multiple concurrent operations
       const operations = [];
       for (let i = 0; i < 50; i++) {
-        operations.push(badgeManager.updateBadgeForTab(i, `https://example${i}.com`));
+        operations.push(badgeManager.updateBadge(i));
       }
 
       const startTime = Date.now();
@@ -296,15 +312,19 @@ describe('Performance and Error Handling Integration', () => {
 
       const badgeManager = await import('../../background_scripts/badge_manager.js');
 
-      // First call - should cache
-      await badgeManager.updateBadgeForTab(1, 'https://example.com');
-      jest.runAllTimers();
+      // Mock tab for the new API
+      global.browser.tabs.get.mockResolvedValue({
+        id: 1,
+        url: 'https://example.com'
+      });
+
+      // First call
+      await badgeManager.updateBadge(1);
 
       const firstCallCount = global.browser.action.setBadgeText.mock.calls.length;
 
-      // Second call - should use cache (test with short interval)
-      await badgeManager.updateBadgeForTab(1, 'https://example.com');
-      jest.runAllTimers();
+      // Second call
+      await badgeManager.updateBadge(1);
 
       const secondCallCount = global.browser.action.setBadgeText.mock.calls.length;
 
@@ -330,16 +350,17 @@ describe('Performance and Error Handling Integration', () => {
 
       const badgeManager = await import('../../background_scripts/badge_manager.js');
 
+      // Mock tab for the new API
+      global.browser.tabs.get.mockResolvedValue({
+        id: 1,
+        url: 'https://example.com'
+      });
+
       // First call
-      await badgeManager.updateBadgeForTab(1, 'https://example.com');
-      jest.runAllTimers();
+      await badgeManager.updateBadge(1);
 
-      // Advance time beyond cache TTL
-      jest.advanceTimersByTime(35000);
-
-      // Second call - cache should be expired
-      await badgeManager.updateBadgeForTab(1, 'https://example.com');
-      jest.runAllTimers();
+      // Second call (no caching in simplified version)
+      await badgeManager.updateBadge(1);
 
       // Should have made fresh calls
       expect(global.browser.action.setBadgeText).toHaveBeenCalled();
@@ -432,10 +453,15 @@ describe('Performance and Error Handling Integration', () => {
         import('../../background_scripts/validation_utils.js')
       ]);
 
+      // Mock tab for the new API
+      global.browser.tabs.get.mockResolvedValue({
+        id: 1,
+        url: 'https://example.com'
+      });
+
       // Perform coordinated operations
       const operations = [
-        badgeManager.updateBadgeForTab(1, 'https://example.com'),
-        badgeManager.refreshCurrentTabBadge(),
+        badgeManager.updateBadge(1),
         validationUtils.validateSiteObject({
           id: 'new-site',
           urlPattern: 'test.com',
@@ -466,10 +492,16 @@ describe('Performance and Error Handling Integration', () => {
       const operationCount = 200;
       const startTime = Date.now();
 
+      // Mock tabs for the new API
+      global.browser.tabs.get.mockImplementation(async (tabId) => ({
+        id: tabId,
+        url: `https://example${tabId % 5}.com`
+      }));
+
       // High-frequency badge updates
       const promises = [];
       for (let i = 0; i < operationCount; i++) {
-        promises.push(badgeManager.updateBadgeForTab(i % 10, `https://example${i % 5}.com`));
+        promises.push(badgeManager.updateBadge(i % 10));
       }
 
       await Promise.allSettled(promises);

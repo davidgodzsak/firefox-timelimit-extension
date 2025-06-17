@@ -1,12 +1,12 @@
 /**
  * @file badge_system_integration.test.js
- * @description Integration tests for Badge System <-> Tab Activity integration
+ * @description Integration tests for Badge System in the Event-Driven Architecture
  * 
  * Tests verify that:
- * - Badge system responds correctly to tab changes
- * - Badge text updates when usage statistics change
- * - Badge system integrates properly with site detection
- * - Performance and caching work as expected
+ * - Badge system integrates properly with the event-driven background script
+ * - Badge text updates correctly when called from background.js
+ * - Badge system works with site detection and usage storage
+ * - Error handling works properly in the integrated system
  */
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
@@ -18,16 +18,7 @@ const mockActionArea = {
 };
 
 const mockTabsArea = {
-  query: jest.fn(),
   get: jest.fn(),
-  onActivated: {
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-  },
-  onUpdated: {
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-  }
 };
 
 const mockStorageArea = {
@@ -48,12 +39,22 @@ global.crypto = {
   randomUUID: jest.fn(),
 };
 
-// Create mock distraction detector before importing modules
-const mockDistractionDetector = {
-  checkIfUrlIsDistracting: jest.fn(() => ({ isMatch: false, siteId: null }))
+// Create mock modules before importing
+const mockSiteStorage = {
+  getDistractingSites: jest.fn()
 };
 
-// Mock the distraction detector module BEFORE importing other modules
+const mockUsageStorage = {
+  getUsageStats: jest.fn()
+};
+
+const mockDistractionDetector = {
+  checkIfUrlIsDistracting: jest.fn()
+};
+
+// Mock the modules before importing
+jest.unstable_mockModule('../../background_scripts/site_storage.js', () => mockSiteStorage);
+jest.unstable_mockModule('../../background_scripts/usage_storage.js', () => mockUsageStorage);
 jest.unstable_mockModule('../../background_scripts/distraction_detector.js', () => mockDistractionDetector);
 
 describe('Badge System Integration', () => {
@@ -61,6 +62,7 @@ describe('Badge System Integration', () => {
   let badgeManager;
   let siteStorage;
   let usageStorage;
+  let distractionDetector;
   let consoleErrorSpy;
   let uuidCounter;
 
@@ -99,27 +101,50 @@ describe('Badge System Integration', () => {
 
     // Setup console spy
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
 
-    // Reset distraction detector mock
+    // Reset mock modules
+    mockSiteStorage.getDistractingSites.mockReset();
+    mockUsageStorage.getUsageStats.mockReset();
     mockDistractionDetector.checkIfUrlIsDistracting.mockReset();
-    mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: false, siteId: null });
+
+    // Setup default mocks
+    mockSiteStorage.getDistractingSites.mockImplementation(async () => {
+      return { success: true, data: mockLocalStorageData.distractingSites || [] };
+    });
+
+    mockUsageStorage.getUsageStats.mockImplementation(async (dateKey) => {
+      return { success: true, data: mockLocalStorageData[`usageStats-${dateKey}`] || {} };
+    });
+
+    mockDistractionDetector.checkIfUrlIsDistracting.mockImplementation((url) => {
+      const sites = mockLocalStorageData.distractingSites || [];
+      for (const site of sites) {
+        if (url.includes(site.urlPattern)) {
+          return { isMatch: true, siteId: site.id };
+        }
+      }
+      return { isMatch: false, siteId: null };
+    });
 
     // Clear all mocks
     jest.clearAllMocks();
 
-    // Import modules fresh (distraction detector is already mocked)
+    // Import modules fresh
     jest.resetModules();
     badgeManager = await import('../../background_scripts/badge_manager.js');
     siteStorage = await import('../../background_scripts/site_storage.js');
     usageStorage = await import('../../background_scripts/usage_storage.js');
+    distractionDetector = await import('../../background_scripts/distraction_detector.js');
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
   });
 
-  describe('tab activation integration', () => {
-    it('should update badge when switching to distracting site tab', async () => {
+  describe('badge updates in event-driven architecture', () => {
+    it('should update badge when called for distracting site', async () => {
       // Setup site with time limit
       const testSite = {
         id: 'site1',
@@ -143,17 +168,8 @@ describe('Badge System Integration', () => {
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      // Mock distraction detector
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'site1'
-      });
-
-      // Trigger tab activation
-      await badgeManager.handleTabActivation({ tabId: 123 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Call updateBadge (as background.js would)
+      await badgeManager.updateBadge(123);
 
       // Verify badge was set correctly (3600 - 1800 = 1800 seconds = 30 minutes)
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
@@ -166,7 +182,7 @@ describe('Badge System Integration', () => {
       });
     });
 
-    it('should clear badge when switching to non-distracting site tab', async () => {
+    it('should clear badge for non-distracting sites', async () => {
       const mockTab = {
         id: 456,
         url: 'https://example.com',
@@ -174,16 +190,7 @@ describe('Badge System Integration', () => {
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      // Mock distraction detector to return no match
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: false,
-        siteId: null
-      });
-
-      await badgeManager.handleTabActivation({ tabId: 456 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await badgeManager.updateBadge(456);
 
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
         text: "",
@@ -191,7 +198,7 @@ describe('Badge System Integration', () => {
       });
     });
 
-    it('should handle tabs with combined time and open limits', async () => {
+    it('should handle sites with combined time and open limits', async () => {
       // Setup site with both limits
       const testSite = {
         id: 'site2',
@@ -202,413 +209,281 @@ describe('Badge System Integration', () => {
       };
       mockLocalStorageData.distractingSites = [testSite];
 
-      // Setup usage data: 3600 seconds used = 1 hour, 7 opens used
+      // Setup usage data with both time and opens used
       const dateKey = new Date().toISOString().split('T')[0];
       mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site2: { timeSpentSeconds: 3600, opens: 7 } // 1 hour used, 7 opens
+        site2: { timeSpentSeconds: 3600, opens: 7 } // 1 hour used, 7 opens used
       };
 
       const mockTab = {
         id: 789,
-        url: 'https://youtube.com',
+        url: 'https://youtube.com/watch?v=test',
         status: 'complete'
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'site2'
-      });
+      await badgeManager.updateBadge(789);
 
-      await badgeManager.handleTabActivation({ tabId: 789 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // 7200 - 3600 = 3600 seconds = 1 hour remaining, 10 - 7 = 3 opens remaining
+      // Should show remaining time and remaining opens
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
         text: "1h/3", // 1 hour remaining / 3 opens remaining
         tabId: 789
       });
     });
 
-    it('should handle exceeding limits correctly', async () => {
-      // Setup site
+    it('should show zero when limits are exceeded', async () => {
+      // Setup site with exceeded limits
       const testSite = {
         id: 'site3',
-        urlPattern: 'twitter.com',
+        urlPattern: 'reddit.com',
         dailyLimitSeconds: 1800, // 30 minutes
         dailyOpenLimit: 5,
         isEnabled: true
       };
       mockLocalStorageData.distractingSites = [testSite];
 
-      // Setup usage data (both limits exceeded)
+      // Setup usage data with exceeded limits
       const dateKey = new Date().toISOString().split('T')[0];
       mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site3: { timeSpentSeconds: 2400, opens: 8 } // Over both limits
+        site3: { timeSpentSeconds: 2400, opens: 8 } // 40 minutes used, 8 opens used
       };
 
       const mockTab = {
-        id: 999,
+        id: 101,
+        url: 'https://reddit.com/r/test',
+        status: 'complete'
+      };
+      mockTabsArea.get.mockResolvedValue(mockTab);
+
+      await badgeManager.updateBadge(101);
+
+      // Should show zeros for exceeded limits
+      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
+        text: "0s/0", // 0 time remaining / 0 opens remaining
+        tabId: 101
+      });
+    });
+
+    it('should handle disabled sites', async () => {
+      // Setup disabled site
+      const testSite = {
+        id: 'site4',
+        urlPattern: 'twitter.com',
+        dailyLimitSeconds: 3600,
+        isEnabled: false // Disabled
+      };
+      mockLocalStorageData.distractingSites = [testSite];
+
+      const mockTab = {
+        id: 202,
         url: 'https://twitter.com',
         status: 'complete'
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'site3'
-      });
+      await badgeManager.updateBadge(202);
 
-      await badgeManager.handleTabActivation({ tabId: 999 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "0s/0", // Both limits exceeded
-        tabId: 999
-      });
-    });
-  });
-
-  describe('tab update integration', () => {
-    it('should update badge when URL changes to distracting site', async () => {
-      const testSite = {
-        id: 'site1',
-        urlPattern: 'facebook.com',
-        dailyLimitSeconds: 3600,
-        isEnabled: true
-      };
-      mockLocalStorageData.distractingSites = [testSite];
-
-      // Setup usage data: 900 seconds used = 15 minutes, so 45 minutes remaining
-      const dateKey = new Date().toISOString().split('T')[0];
-      mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site1: { timeSpentSeconds: 900, opens: 1 } // 15 minutes used
-      };
-
-      const mockTab = {
-        id: 123,
-        url: 'https://facebook.com',
-        status: 'complete',
-        active: true
-      };
-
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'site1'
-      });
-
-      await badgeManager.handleTabUpdate(123, { url: 'https://facebook.com' }, mockTab);
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // 3600 - 900 = 2700 seconds = 45 minutes remaining
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "45m", // 45 minutes remaining
-        tabId: 123
-      });
-    });
-
-    it('should ignore non-URL changes', async () => {
-      const mockTab = {
-        id: 123,
-        url: 'https://facebook.com',
-        status: 'complete',
-        active: true
-      };
-
-      // Only title changed, not URL
-      await badgeManager.handleTabUpdate(123, { title: 'New Page Title' }, mockTab);
-
-      expect(mockActionArea.setBadgeText).not.toHaveBeenCalled();
-    });
-
-    it('should not update badge for loading tabs', async () => {
-      const mockTab = {
-        id: 123,
-        url: 'https://facebook.com',
-        status: 'loading',
-        active: false
-      };
-
-      await badgeManager.handleTabUpdate(123, { url: 'https://facebook.com' }, mockTab);
-
-      expect(mockActionArea.setBadgeText).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('refresh current tab integration', () => {
-    it('should refresh badge for currently active tab', async () => {
-      const testSite = {
-        id: 'site1',
-        urlPattern: 'facebook.com',
-        dailyOpenLimit: 5,
-        isEnabled: true
-      };
-      mockLocalStorageData.distractingSites = [testSite];
-
-      // Setup usage data: 2 opens used, so 3 opens remaining
-      const dateKey = new Date().toISOString().split('T')[0];
-      mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site1: { timeSpentSeconds: 1000, opens: 2 }
-      };
-
-      // Mock distraction detector
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'site1'
-      });
-
-      // Directly test badge update for the specific tab/URL
-      // This simulates what refreshCurrentTabBadge should do
-      await badgeManager.updateBadgeForTab(123, 'https://facebook.com');
-      
-      // Wait for debounced operations to complete
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // 5 - 2 = 3 opens remaining
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "3", // 3 opens remaining
-        tabId: 123
-      });
-    });
-
-    it('should handle no active tabs for direct badge update', async () => {
-      // Mock for non-distracting site
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: false,
-        siteId: null
-      });
-
-      await badgeManager.updateBadgeForTab(456, 'https://example.com');
-      
-      // Wait for debounced operations to complete
-      await new Promise(resolve => setTimeout(resolve, 300));
-
+      // Should clear badge for disabled sites
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
         text: "",
-        tabId: 456
+        tabId: 202
       });
     });
   });
 
-  describe('clear all badges integration', () => {
-    it('should clear badges for all open tabs', async () => {
-      const mockTabs = [
-        { id: 123, url: 'https://facebook.com' },
-        { id: 456, url: 'https://youtube.com' },
-        { id: 789, url: 'https://example.com' }
-      ];
-      mockTabsArea.query.mockResolvedValue(mockTabs);
+  describe('error handling integration', () => {
+    it('should handle storage errors gracefully', async () => {
+      // Mock storage error
+      mockStorageArea.get.mockRejectedValue(new Error('Storage error'));
 
-      await badgeManager.clearAllBadges();
+      const mockTab = {
+        id: 303,
+        url: 'https://facebook.com',
+        status: 'complete'
+      };
+      mockTabsArea.get.mockResolvedValue(mockTab);
 
-      expect(mockTabsArea.query).toHaveBeenCalledWith({});
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledTimes(3);
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({ text: "", tabId: 123 });
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({ text: "", tabId: 456 });
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({ text: "", tabId: 789 });
+      await expect(badgeManager.updateBadge(303)).resolves.not.toThrow();
+
+      // Should clear badge on storage error
+      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
+        text: "",
+        tabId: 303
+      });
     });
-  });
 
-  describe('end-to-end workflow integration', () => {
-    it('should handle complete site addition and badge update workflow', async () => {
-      // 1. Add a new site
-      const newSite = {
-        id: 'new-site',
+    it('should handle tab fetch errors gracefully', async () => {
+      mockTabsArea.get.mockRejectedValue(new Error('Tab not found'));
+
+      await expect(badgeManager.updateBadge(404)).resolves.not.toThrow();
+
+      // Should attempt to clear badge even on tab error
+      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
+        text: "",
+        tabId: 404
+      });
+    });
+
+    it('should handle badge API errors gracefully', async () => {
+      const testSite = {
+        id: 'site5',
         urlPattern: 'instagram.com',
-        dailyLimitSeconds: 1800, // 30 minutes
-        dailyOpenLimit: 5,
+        dailyLimitSeconds: 1800,
         isEnabled: true
       };
-      mockLocalStorageData.distractingSites = [newSite];
+      mockLocalStorageData.distractingSites = [testSite];
 
-      // 2. Setup usage data: no usage yet, so full limits remain
-      const dateKey = new Date().toISOString().split('T')[0];
-      mockLocalStorageData[`usageStats-${dateKey}`] = {
-        'new-site': { timeSpentSeconds: 0, opens: 0 } // No usage yet
-      };
-
-      // 3. Mock tab
       const mockTab = {
-        id: 123,
+        id: 505,
         url: 'https://instagram.com',
         status: 'complete'
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      // 4. Mock distraction detector
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'new-site'
-      });
+      // Mock badge API error
+      mockActionArea.setBadgeText.mockRejectedValue(new Error('Badge API error'));
 
-      // 5. Activate tab (should trigger badge update)
-      await badgeManager.handleTabActivation({ tabId: 123 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // 6. Verify badge shows correct remaining time and opens (1800 seconds = 30 minutes, 5 opens)
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "30m/5", // 30 minutes / 5 opens remaining
-        tabId: 123
-      });
+      await expect(badgeManager.updateBadge(505)).resolves.not.toThrow();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[BadgeManager] Error setting badge text:',
+        expect.any(Error)
+      );
     });
+  });
 
-    it('should handle site limit updates and badge refresh', async () => {
-      // Setup site
-      const existingSite = {
-        id: 'update-site',
-        urlPattern: 'reddit.com',
-        dailyLimitSeconds: 3600, // 1 hour
+  describe('edge cases and data validation', () => {
+    it('should handle missing usage data', async () => {
+      // Setup site but no usage data
+      const testSite = {
+        id: 'site6',
+        urlPattern: 'github.com',
+        dailyLimitSeconds: 7200, // 2 hours
         isEnabled: true
       };
-      mockLocalStorageData.distractingSites = [existingSite];
-
-      // Setup usage data: no usage, so full hour remains
-      const dateKey = new Date().toISOString().split('T')[0];
-      mockLocalStorageData[`usageStats-${dateKey}`] = {
-        'update-site': { timeSpentSeconds: 0, opens: 2 } // No time used
-      };
+      mockLocalStorageData.distractingSites = [testSite];
+      // No usage data in storage
 
       const mockTab = {
-        id: 456,
-        url: 'https://reddit.com',
+        id: 606,
+        url: 'https://github.com',
         status: 'complete'
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'update-site'
-      });
+      await badgeManager.updateBadge(606);
 
-      await badgeManager.handleTabActivation({ tabId: 456 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // 3600 - 0 = 3600 seconds = 1 hour remaining
+      // Should show full limit when no usage data
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "1h", // 1 hour remaining
-        tabId: 456
+        text: "2h", // Full 2 hours
+        tabId: 606
       });
     });
 
-    it('should handle site deletion and badge clearing', async () => {
-      // Setup site
-      const existingSite = {
-        id: 'delete-site',
-        urlPattern: 'tiktok.com',
-        dailyLimitSeconds: 3600, // 1 hour
-        isEnabled: true
-      };
-      mockLocalStorageData.distractingSites = [existingSite];
+    it('should handle sites not in storage', async () => {
+      // Empty sites storage
+      mockLocalStorageData.distractingSites = [];
 
       const mockTab = {
-        id: 789,
-        url: 'https://tiktok.com',
+        id: 707,
+        url: 'https://unknown-distracting-site.com',
         status: 'complete'
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'delete-site'
-      });
+      await badgeManager.updateBadge(707);
 
-      await badgeManager.handleTabActivation({ tabId: 789 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
+      // Should clear badge for sites not in storage
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "1h",
-        tabId: 789
+        text: "",
+        tabId: 707
+      });
+    });
+
+    it('should handle browser internal pages', async () => {
+      const mockTab = {
+        id: 808,
+        url: 'chrome://settings/',
+        status: 'complete'
+      };
+      mockTabsArea.get.mockResolvedValue(mockTab);
+
+      await badgeManager.updateBadge(808);
+
+      // Should clear badge for internal pages
+      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
+        text: "",
+        tabId: 808
       });
     });
   });
 
-  describe('error handling and edge cases', () => {
-    it('should handle tab API errors gracefully', async () => {
-      mockTabsArea.get.mockRejectedValue(new Error('Tab not found'));
-
-      // Should not throw an error
-      await expect(badgeManager.handleTabActivation({ tabId: 999 })).resolves.not.toThrow();
-      
-      // Should have logged the error
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[BadgeManager] Error handling tab activation:', expect.any(Error));
-    });
-
-    it('should handle storage errors during badge calculation', async () => {
-      // Mock tab successfully
-      const mockTab = {
-        id: 123,
-        url: 'https://facebook.com',
-        status: 'complete'
-      };
-      mockTabsArea.get.mockResolvedValue(mockTab);
-
-      // Mock distraction detector
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'site1'
-      });
-
-      // Make storage fail
-      mockStorageArea.get.mockRejectedValue(new Error('Storage error'));
-
-      await badgeManager.handleTabActivation({ tabId: 123 });
-
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // Storage errors should be caught at module level, but we can verify errors were logged
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      // Should contain either error from getting sites or usage stats
-      const errorCalls = consoleErrorSpy.mock.calls;
-      const hasStorageError = errorCalls.some(call => 
-        call[0].includes('Error getting') && call[1].message === 'Storage error'
-      );
-      expect(hasStorageError).toBe(true);
-    });
-
-    it('should handle disabled sites correctly', async () => {
-      // Setup disabled site
-      const disabledSite = {
-        id: 'disabled-site',
-        urlPattern: 'facebook.com',
+  describe('performance and consistency', () => {
+    it('should handle multiple rapid badge updates', async () => {
+      const testSite = {
+        id: 'site7',
+        urlPattern: 'example.com',
         dailyLimitSeconds: 3600,
-        isEnabled: false
+        isEnabled: true
       };
-      mockLocalStorageData.distractingSites = [disabledSite];
+      mockLocalStorageData.distractingSites = [testSite];
 
       const mockTab = {
-        id: 123,
-        url: 'https://facebook.com',
+        id: 909,
+        url: 'https://example.com',
         status: 'complete'
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
-        isMatch: true,
-        siteId: 'disabled-site'
+      // Make multiple rapid calls (as might happen in real usage)
+      const promises = [];
+      for (let i = 0; i < 5; i++) {
+        promises.push(badgeManager.updateBadge(909));
+      }
+
+      await expect(Promise.allSettled(promises)).resolves.toBeDefined();
+
+      // All calls should complete without errors
+      const results = await Promise.allSettled(promises);
+      results.forEach(result => {
+        expect(result.status).toBe('fulfilled');
+      });
+    });
+
+    it('should maintain consistency across multiple tabs', async () => {
+      const testSite = {
+        id: 'site8',
+        urlPattern: 'multitab-site.com',
+        dailyLimitSeconds: 1800, // 30 minutes
+        isEnabled: true
+      };
+      mockLocalStorageData.distractingSites = [testSite];
+
+      const dateKey = new Date().toISOString().split('T')[0];
+      mockLocalStorageData[`usageStats-${dateKey}`] = {
+        site8: { timeSpentSeconds: 600, opens: 2 } // 10 minutes used
+      };
+
+      // Setup multiple tabs for the same site
+      const tabs = [
+        { id: 1001, url: 'https://multitab-site.com/page1' },
+        { id: 1002, url: 'https://multitab-site.com/page2' },
+        { id: 1003, url: 'https://multitab-site.com/page3' }
+      ];
+
+      // Mock tab.get to return appropriate tab for each call
+      mockTabsArea.get.mockImplementation(async (tabId) => {
+        return tabs.find(tab => tab.id === tabId);
       });
 
-      await badgeManager.handleTabActivation({ tabId: 123 });
+      // Update badges for all tabs
+      await Promise.all(tabs.map(tab => badgeManager.updateBadge(tab.id)));
 
-      // Wait for debounced update to complete (100ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // Should clear badge for disabled site
-      expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 123
+      // All tabs should show the same badge text
+      tabs.forEach(tab => {
+        expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
+          text: "20m", // 20 minutes remaining (30 - 10)
+          tabId: tab.id
+        });
       });
     });
   });
