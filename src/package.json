@@ -2,7 +2,7 @@
   "name": "distraction-limiter",
   "version": "1.1.0",
   "description":  "Helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached. Features customizable time limits, motivational timeout notes, and clean modern UI.",
-  "main": "./background_scripts/main.js",
+  "main": "./background_scripts/background.js",
   "type": "module",
   "scripts": {
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",

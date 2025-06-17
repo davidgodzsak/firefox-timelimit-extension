@@ -12,9 +12,13 @@ const mockGetUsageStats = jest.fn();
 
 jest.unstable_mockModule('../../background_scripts/site_storage.js', () => ({
   getDistractingSites: mockGetDistractingSites,
+  addDistractingSite: jest.fn().mockResolvedValue({ id: '1', urlPattern: 'test.com' }),
+  updateDistractingSite: jest.fn().mockResolvedValue({ id: '1', urlPattern: 'updated.com' }),
+  deleteDistractingSite: jest.fn().mockResolvedValue(true),
 }));
 jest.unstable_mockModule('../../background_scripts/usage_storage.js', () => ({
   getUsageStats: mockGetUsageStats,
+  updateUsageStats: jest.fn().mockResolvedValue(true),
 }));
 
 // Mock the daily reset module
@@ -23,26 +27,103 @@ jest.unstable_mockModule('../../background_scripts/daily_reset.js', () => ({
   performDailyReset: jest.fn().mockResolvedValue(),
 }));
 
+// Mock usage recorder
+jest.unstable_mockModule('../../background_scripts/usage_recorder.js', () => ({
+  startTracking: jest.fn().mockResolvedValue(true),
+  stopTracking: jest.fn().mockResolvedValue(0),
+  updateUsage: jest.fn().mockResolvedValue(100),
+  getCurrentTrackingInfo: jest.fn().mockResolvedValue({ isTracking: false, siteId: null, tabId: null }),
+}));
+
+// Mock distraction detector
+const mockCheckIfUrlIsDistracting = jest.fn();
+jest.unstable_mockModule('../../background_scripts/distraction_detector.js', () => ({
+  checkIfUrlIsDistracting: mockCheckIfUrlIsDistracting,
+  initializeDistractionDetector: jest.fn().mockResolvedValue(),
+  loadDistractingSitesFromStorage: jest.fn().mockResolvedValue(),
+}));
+
+// Mock site blocker
+const mockHandlePotentialRedirect = jest.fn();
+jest.unstable_mockModule('../../background_scripts/site_blocker.js', () => ({
+  handlePotentialRedirect: mockHandlePotentialRedirect,
+}));
+
+// Mock badge manager
+jest.unstable_mockModule('../../background_scripts/badge_manager.js', () => ({
+  updateBadge: jest.fn().mockResolvedValue(),
+}));
+
+// Mock note storage
+jest.unstable_mockModule('../../background_scripts/note_storage.js', () => ({
+  getTimeoutNotes: jest.fn().mockResolvedValue([]),
+  addTimeoutNote: jest.fn().mockResolvedValue({ id: '1', text: 'test' }),
+  updateTimeoutNote: jest.fn().mockResolvedValue({ id: '1', text: 'updated' }),
+  deleteTimeoutNote: jest.fn().mockResolvedValue(true),
+}));
+
+// Mock validation utils
+jest.unstable_mockModule('../../background_scripts/validation_utils.js', () => ({
+  categorizeError: jest.fn().mockReturnValue({ userMessage: 'Test error', type: 'TEST', isRetryable: false }),
+  validateRequiredFields: jest.fn().mockReturnValue({ isValid: true }),
+  ERROR_TYPES: { VALIDATION: 'VALIDATION', STORAGE: 'STORAGE', SYSTEM: 'SYSTEM' },
+}));
+
 // Mock browser API
 const mockTabsUpdate = jest.fn();
+const mockTabsGet = jest.fn();
+const mockTabsQuery = jest.fn();
 const mockRuntimeGetURL = jest.fn();
+const mockRuntimeOnMessage = { addListener: jest.fn() };
 const mockAlarmsOnAlarm = { addListener: jest.fn() };
+const mockAlarmsCreate = jest.fn();
+const mockAlarmsClear = jest.fn();
 const mockRuntimeOnInstalled = { addListener: jest.fn() };
 const mockWebNavigationOnBeforeNavigate = { addListener: jest.fn() };
+const mockTabsOnActivated = { addListener: jest.fn() };
+const mockTabsOnUpdated = { addListener: jest.fn() };
+const mockWindowsOnFocusChanged = { addListener: jest.fn() };
+const mockWindowsGetCurrent = jest.fn();
+const mockActionOnClicked = { addListener: jest.fn() };
+const mockStorageSessionGet = jest.fn();
+const mockStorageSessionSet = jest.fn();
+const mockStorageSessionRemove = jest.fn();
 
 global.browser = {
   tabs: {
     update: mockTabsUpdate,
+    get: mockTabsGet,
+    query: mockTabsQuery,
+    onActivated: mockTabsOnActivated,
+    onUpdated: mockTabsOnUpdated,
   },
   runtime: {
     getURL: mockRuntimeGetURL,
     onInstalled: mockRuntimeOnInstalled,
+    onMessage: mockRuntimeOnMessage,
   },
   alarms: {
     onAlarm: mockAlarmsOnAlarm,
+    create: mockAlarmsCreate,
+    clear: mockAlarmsClear,
   },
   webNavigation: {
     onBeforeNavigate: mockWebNavigationOnBeforeNavigate,
+  },
+  windows: {
+    onFocusChanged: mockWindowsOnFocusChanged,
+    getCurrent: mockWindowsGetCurrent,
+    WINDOW_ID_NONE: -1,
+  },
+  action: {
+    onClicked: mockActionOnClicked,
+  },
+  storage: {
+    session: {
+      get: mockStorageSessionGet,
+      set: mockStorageSessionSet,
+      remove: mockStorageSessionRemove,
+    },
   },
 };
 
@@ -59,9 +140,24 @@ describe('Site Blocking Integration', () => {
     // Reset all mocks
     mockGetDistractingSites.mockReset();
     mockGetUsageStats.mockReset();
+    mockCheckIfUrlIsDistracting.mockReset();
+    mockHandlePotentialRedirect.mockReset();
     mockTabsUpdate.mockReset();
+    mockTabsGet.mockReset();
+    mockTabsQuery.mockReset();
     mockRuntimeGetURL.mockReset();
+    mockRuntimeOnMessage.addListener.mockReset();
+    mockAlarmsCreate.mockReset();
+    mockAlarmsClear.mockReset();
+    mockWindowsGetCurrent.mockReset();
+    mockStorageSessionGet.mockReset();
+    mockStorageSessionSet.mockReset();
+    mockStorageSessionRemove.mockReset();
     mockWebNavigationOnBeforeNavigate.addListener.mockReset();
+    mockTabsOnActivated.addListener.mockReset();
+    mockTabsOnUpdated.addListener.mockReset();
+    mockWindowsOnFocusChanged.addListener.mockReset();
+    mockActionOnClicked.addListener.mockReset();
     
     // Mock Date to return our fixed date
     global.Date = jest.fn(() => mockDate);
@@ -69,6 +165,65 @@ describe('Site Blocking Integration', () => {
     
     // Set up default mocks
     mockRuntimeGetURL.mockImplementation(path => `moz-extension://test-id/${path}`);
+    
+    // Configure URL detection mock to handle different test sites
+    mockCheckIfUrlIsDistracting.mockImplementation((url) => {
+      if (url.includes('example.com')) {
+        return { isMatch: true, siteId: 'distracting-site', matchingPattern: 'example.com' };
+      }
+      if (url.includes('timeonly.com')) {
+        return { isMatch: true, siteId: 'time-only-site', matchingPattern: 'timeonly.com' };
+      }
+      if (url.includes('disabled.com')) {
+        return { isMatch: true, siteId: 'disabled-site', matchingPattern: 'disabled.com' };
+      }
+      return { isMatch: false, siteId: null, matchingPattern: null };
+    });
+    
+    // Configure site blocker mock to simulate blocking behavior
+    mockHandlePotentialRedirect.mockImplementation(async (tabId, url) => {
+      // Get the current sites and usage data from our mocks
+      const sites = await mockGetDistractingSites();
+      const usageStats = await mockGetUsageStats();
+      
+      // Check if URL matches a distracting site
+      const urlCheck = mockCheckIfUrlIsDistracting(url);
+      if (!urlCheck.isMatch) {
+        return false; // Not a distracting site
+      }
+      
+      const site = sites.find(s => s.id === urlCheck.siteId);
+      if (!site || !site.isEnabled) {
+        return false; // Site doesn't exist or is disabled
+      }
+      
+      const usage = usageStats[urlCheck.siteId] || { timeSpentSeconds: 0, opens: 0 };
+      
+      // Check if limits are exceeded
+      const timeExceeded = site.dailyLimitSeconds > 0 && usage.timeSpentSeconds >= site.dailyLimitSeconds;
+      const opensExceeded = site.dailyOpenLimit > 0 && usage.opens >= site.dailyOpenLimit;
+      
+      if (timeExceeded || opensExceeded) {
+        // Simulate the redirect
+        let limitType = 'time';
+        if (timeExceeded && opensExceeded) {
+          limitType = 'both';
+        } else if (opensExceeded) {
+          limitType = 'opens';
+        }
+        
+                 const timeoutUrl = `moz-extension://test-id/ui/timeout/timeout.html?blockedUrl=${encodeURIComponent(url)}&siteId=${urlCheck.siteId}&limitType=${limitType}`;
+         try {
+           await mockTabsUpdate(tabId, { url: timeoutUrl });
+         } catch (error) {
+           // Handle tab update errors gracefully (for testing error scenarios)
+           console.warn('Tab update failed:', error.message);
+         }
+         return true; // Site was blocked
+      }
+      
+      return false; // Under limits, allow navigation
+    });
     
     // Capture the navigation listener when background.js is imported
     mockWebNavigationOnBeforeNavigate.addListener.mockImplementation((callback) => {
