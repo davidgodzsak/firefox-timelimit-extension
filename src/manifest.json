@@ -21,7 +21,7 @@
   },
   "background": {
     "scripts": [
-      "background_scripts/main.js"
+      "background_scripts/background.js"
     ],
     "type": "module"
   },
