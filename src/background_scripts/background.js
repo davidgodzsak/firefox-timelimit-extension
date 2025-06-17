@@ -8,11 +8,13 @@
  * Key responsibilities:
  * - Listen to browser.runtime.onInstalled to initialize alarms
  * - Listen to browser.alarms.onAlarm to handle scheduled tasks
- * - Route events to appropriate modules (daily reset, usage tracking, etc.)
+ * - Listen to browser.webNavigation.onBeforeNavigate for proactive site blocking
+ * - Route events to appropriate modules (daily reset, usage tracking, site blocking, etc.)
  * - Maintain stateless architecture with chrome.storage as single source of truth
  */
 
 import { initializeDailyResetAlarm, performDailyReset } from './daily_reset.js';
+import { handlePotentialRedirect } from './site_blocker.js';
 
 /**
  * Handles the extension installation or startup.
@@ -60,8 +62,49 @@ async function handleAlarm(alarm) {
   }
 }
 
+/**
+ * Handles navigation events before the navigation occurs.
+ * This enables proactive site blocking before the page loads.
+ * Only processes main frame navigations to avoid blocking iframes, ads, etc.
+ * 
+ * @param {Object} details - Navigation details from browser.webNavigation.onBeforeNavigate
+ * @param {number} details.tabId - The tab ID where navigation is occurring
+ * @param {string} details.url - The URL being navigated to
+ * @param {number} details.frameId - The frame ID (0 for main frame)
+ * @param {string} details.transitionType - Type of navigation transition
+ */
+async function handleBeforeNavigate(details) {
+  // Only process main frame navigations (frameId 0)
+  // This avoids blocking iframes, ads, and other sub-resources
+  if (details.frameId !== 0) {
+    return;
+  }
+
+  const { tabId, url } = details;
+  console.log(`[Background] Navigation detected: tab ${tabId} -> ${url}`);
+
+  // Validate inputs
+  if (!tabId || !url) {
+    console.warn('[Background] Invalid navigation details:', { tabId, url });
+    return;
+  }
+
+  try {
+    // Check if the site should be blocked and redirect if necessary
+    const wasRedirected = await handlePotentialRedirect(tabId, url);
+    
+    if (wasRedirected) {
+      console.log(`[Background] Successfully blocked navigation to ${url} in tab ${tabId}`);
+    }
+  } catch (error) {
+    console.error('[Background] Error during navigation blocking check:', error);
+    // Don't block navigation on error to avoid false positives
+  }
+}
+
 // Set up event listeners
 browser.runtime.onInstalled.addListener(handleInstalled);
 browser.alarms.onAlarm.addListener(handleAlarm);
+browser.webNavigation.onBeforeNavigate.addListener(handleBeforeNavigate);
 
-console.log('[Background] Event-driven background script loaded'); 
+console.log('[Background] Event-driven background script loaded with site blocking capability'); 

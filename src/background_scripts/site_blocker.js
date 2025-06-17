@@ -3,6 +3,9 @@
  * @description Manages the blocking of distracting sites when their daily time or open count limits are exceeded.
  * Works in conjunction with the usage_storage and site_storage modules to determine when to block.
  * Updated to support both time limits and open count limits.
+ * 
+ * This module is now event-driven and called directly from background.js navigation events.
+ * It operates statelessly, retrieving all necessary data from chrome.storage on each call.
  */
 
 import { getDistractingSites } from './site_storage.js';
@@ -48,8 +51,10 @@ function _generateBlockingReason(site, siteStats, timeExceeded, opensExceeded) {
 /**
  * Checks if a site should be blocked based on its daily limits and current usage.
  * Now supports both time limits and open count limits.
- * @param {string} tabId - The ID of the tab to check.
- * @param {string} url - The URL to check.
+ * This function is stateless and suitable for event-driven architecture.
+ * 
+ * @param {string|number} tabId - The ID of the tab to check (from navigation event)
+ * @param {string} url - The URL to check (from navigation event)
  * @returns {Promise<{shouldBlock: boolean, siteId: string|null, reason: string|null, limitType: string|null}>} Object containing:
  *   - shouldBlock: Whether the site should be blocked
  *   - siteId: The ID of the matched distracting site, if any
@@ -57,7 +62,8 @@ function _generateBlockingReason(site, siteStats, timeExceeded, opensExceeded) {
  *   - limitType: The type of limit that was exceeded ('time', 'opens', or 'both')
  */
 export async function checkAndBlockSite(tabId, url) {
-  if (!tabId || !url) {
+  // Enhanced validation for navigation event parameters
+  if (!tabId || !url || typeof url !== 'string') {
     console.warn('[SiteBlocker] Invalid parameters provided to checkAndBlockSite:', { tabId, url });
     return { shouldBlock: false, siteId: null, reason: null, limitType: null };
   }
@@ -180,9 +186,12 @@ export async function checkOpenLimitBeforeAccess(url) {
 
 /**
  * Redirects a tab to the timeout page if the site should be blocked.
- * @param {string} tabId - The ID of the tab to potentially redirect.
- * @param {string} url - The URL being accessed.
- * @returns {Promise<boolean>} Whether the tab was redirected.
+ * This is the main entry point called by the event-driven background script.
+ * It checks blocking status and performs redirection if necessary.
+ * 
+ * @param {string|number} tabId - The ID of the tab to potentially redirect (from navigation event)
+ * @param {string} url - The URL being accessed (from navigation event)
+ * @returns {Promise<boolean>} Whether the tab was redirected
  */
 export async function handlePotentialRedirect(tabId, url) {
   try {

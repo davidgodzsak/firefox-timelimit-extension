@@ -1,6 +1,7 @@
 /**
  * @file site_blocker.test.js
  * @description Unit tests for the site_blocker.js module.
+ * Updated for event-driven architecture with webNavigation integration.
  */
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
@@ -81,6 +82,42 @@ describe('site_blocker.js', () => {
   describe('checkAndBlockSite', () => {
     it('should return shouldBlock: false for invalid parameters', async () => {
       const result = await checkAndBlockSite(null, null);
+      expect(result).toEqual({
+        shouldBlock: false,
+        siteId: null,
+        reason: null,
+        limitType: null
+      });
+    });
+
+    it('should return shouldBlock: false for invalid URL parameter type', async () => {
+      const result = await checkAndBlockSite(123, 456); // URL should be string
+      expect(result).toEqual({
+        shouldBlock: false,
+        siteId: null,
+        reason: null,
+        limitType: null
+      });
+    });
+
+    it('should handle string tabId from navigation events', async () => {
+      mockGetDistractingSites.mockResolvedValue(sampleSites);
+      mockGetUsageStats.mockResolvedValue({});
+
+      const result = await checkAndBlockSite('123', 'http://nonmatching.com'); // string tabId
+      expect(result).toEqual({
+        shouldBlock: false,
+        siteId: null,
+        reason: null,
+        limitType: null
+      });
+    });
+
+    it('should handle numeric tabId from navigation events', async () => {
+      mockGetDistractingSites.mockResolvedValue(sampleSites);
+      mockGetUsageStats.mockResolvedValue({});
+
+      const result = await checkAndBlockSite(123, 'http://nonmatching.com'); // numeric tabId
       expect(result).toEqual({
         shouldBlock: false,
         siteId: null,
@@ -330,71 +367,61 @@ describe('site_blocker.js', () => {
   });
 
   describe('handlePotentialRedirect', () => {
-    it('should not redirect when site should not be blocked', async () => {
-      mockGetDistractingSites.mockResolvedValue([
-        {
-          id: '123',
-          urlPattern: 'example.com',
-          isEnabled: true,
-          dailyLimitSeconds: 3600
-        }
-      ]);
-
+    it('should redirect tab when site should be blocked', async () => {
+      mockGetDistractingSites.mockResolvedValue(sampleSites);
       mockGetUsageStats.mockResolvedValue({
-        '123': {
-          timeSpentSeconds: 1800, // Under limit
-          opens: 5
-        }
+        site1: { timeSpentSeconds: 4000, opens: 10 } // Over time limit
       });
 
-      const wasRedirected = await handlePotentialRedirect('tab1', 'https://example.com');
-      expect(wasRedirected).toBe(false);
+      const result = await handlePotentialRedirect(123, 'http://example.com');
+      
+      expect(result).toBe(true);
+      expect(browser.tabs.update).toHaveBeenCalledWith(123, {
+        url: expect.stringContaining('ui/timeout/timeout.html')
+      });
+    });
+
+    it('should not redirect tab when site should not be blocked', async () => {
+      mockGetDistractingSites.mockResolvedValue(sampleSites);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 1800, opens: 5 } // Under limits
+      });
+
+      const result = await handlePotentialRedirect(123, 'http://example.com');
+      
+      expect(result).toBe(false);
       expect(browser.tabs.update).not.toHaveBeenCalled();
     });
 
-    it('should redirect when site should be blocked', async () => {
-      const siteId = '123';
-      const blockedUrl = 'https://example.com';
-      
-      mockGetDistractingSites.mockResolvedValue([
-        {
-          id: siteId,
-          urlPattern: 'example.com',
-          isEnabled: true,
-          dailyLimitSeconds: 3600
-        }
-      ]);
-
+    it('should handle redirection errors gracefully', async () => {
+      mockGetDistractingSites.mockResolvedValue(sampleSites);
       mockGetUsageStats.mockResolvedValue({
-        [siteId]: {
-          timeSpentSeconds: 4000, // Over limit
-          opens: 5
-        }
+        site1: { timeSpentSeconds: 4000, opens: 10 } // Over limits
       });
+      browser.tabs.update.mockRejectedValue(new Error('Tab update failed'));
 
-      const wasRedirected = await handlePotentialRedirect('tab1', blockedUrl);
+      const result = await handlePotentialRedirect(123, 'http://example.com');
       
-      expect(wasRedirected).toBe(true);
-      expect(browser.runtime.getURL).toHaveBeenCalledWith('ui/timeout/timeout.html');
-      expect(browser.tabs.update).toHaveBeenCalledWith('tab1', {
-        url: expect.stringContaining('timeout.html')
-      });
-
-      // Verify URL parameters including new limitType parameter
-      const updateCall = browser.tabs.update.mock.calls[0];
-      const redirectUrl = new URL(updateCall[1].url);
-      expect(redirectUrl.searchParams.get('blockedUrl')).toBe(blockedUrl);
-      expect(redirectUrl.searchParams.get('siteId')).toBe(siteId);
-      expect(redirectUrl.searchParams.get('reason')).toBeTruthy();
-      expect(redirectUrl.searchParams.get('limitType')).toBe('time');
+      expect(result).toBe(false);
     });
 
-    it('should handle errors gracefully', async () => {
-      mockGetDistractingSites.mockRejectedValue(new Error('Storage error'));
+    it('should include correct URL parameters in timeout redirect', async () => {
+      mockGetDistractingSites.mockResolvedValue(sampleSites);
+      mockGetUsageStats.mockResolvedValue({
+        site1: { timeSpentSeconds: 4000, opens: 10 } // Over time limit
+      });
 
-      const wasRedirected = await handlePotentialRedirect('tab1', 'https://example.com');
-      expect(wasRedirected).toBe(false);
-      expect(browser.tabs.update).not.toHaveBeenCalled();
+      await handlePotentialRedirect(123, 'http://example.com/page');
+      
+      expect(browser.tabs.update).toHaveBeenCalledWith(123, {
+        url: expect.stringMatching(/blockedUrl=http%3A%2F%2Fexample\.com%2Fpage/)
+      });
+      expect(browser.tabs.update).toHaveBeenCalledWith(123, {
+        url: expect.stringMatching(/siteId=site1/)
+      });
+      expect(browser.tabs.update).toHaveBeenCalledWith(123, {
+        url: expect.stringMatching(/limitType=time/)
+      });
     });
   });
 
