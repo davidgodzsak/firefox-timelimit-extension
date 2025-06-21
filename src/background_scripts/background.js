@@ -16,7 +16,7 @@
  */
 
 import { initializeDailyResetAlarm, performDailyReset } from './daily_reset.js';
-import { handlePotentialRedirect } from './site_blocker.js';
+import { handlePotentialRedirect, checkAndBlockSite } from './site_blocker.js';
 import { startTracking, stopTracking, updateUsage, getCurrentTrackingInfo } from './usage_recorder.js';
 import { checkIfUrlIsDistracting, initializeDistractionDetector, loadDistractingSitesFromStorage } from './distraction_detector.js';
 import { updateBadge } from './badge_manager.js';
@@ -73,7 +73,7 @@ async function handleAlarm(alarm) {
         console.log('[Background] Daily reset completed successfully');
         break;
         
-      case 'usageTimer':
+      case 'usageTimer': {
         // Update usage for currently tracked site
         const totalTimeSeconds = await updateUsage();
         console.log(`[Background] Usage updated via alarm. Total time: ${totalTimeSeconds}s`);
@@ -82,13 +82,17 @@ async function handleAlarm(alarm) {
         try {
           const trackingInfo = await getCurrentTrackingInfo();
           if (trackingInfo.isTracking && trackingInfo.tabId) {
+            console.log(`[Background] Updating badge for tracked tab ${trackingInfo.tabId} after usage update`);
             await updateBadge(trackingInfo.tabId);
+          } else {
+            console.log(`[Background] No active tracking found during alarm, skipping badge update`);
           }
         } catch (error) {
           console.warn('[Background] Error updating badge after usage alarm:', error);
           // Continue without badge update - non-critical
         }
         break;
+      }
       
       default:
         console.warn(`[Background] Unknown alarm: ${alarm.name}`);
@@ -103,6 +107,7 @@ async function handleAlarm(alarm) {
  * Handles navigation events before the navigation occurs.
  * This enables proactive site blocking before the page loads.
  * Only processes main frame navigations to avoid blocking iframes, ads, etc.
+ * FIXED: Now properly updates usage before checking blocking to ensure accurate limit enforcement.
  * 
  * @param {Object} details - Navigation details from browser.webNavigation.onBeforeNavigate
  * @param {number} details.tabId - The tab ID where navigation is occurring
@@ -127,11 +132,27 @@ async function handleBeforeNavigate(details) {
   }
 
   try {
+    // CRITICAL FIX: Update any active tracking before checking blocking
+    // This ensures we have the most current usage data for limit checks
+    const currentTrackingInfo = await getCurrentTrackingInfo();
+    if (currentTrackingInfo.isTracking && currentTrackingInfo.tabId === tabId) {
+      console.log(`[Background] Updating usage for current tracking before navigation blocking check`);
+      await updateUsage();
+    }
+    
     // Check if the site should be blocked and redirect if necessary
     const wasRedirected = await handlePotentialRedirect(tabId, url);
     
     if (wasRedirected) {
       console.log(`[Background] Successfully blocked navigation to ${url} in tab ${tabId}`);
+      // Stop any current tracking since we're redirecting to timeout page
+      await stopTracking();
+      try {
+        await browser.alarms.clear('usageTimer');
+        console.log('[Background] Cleared usage timer after blocking redirect');
+      } catch (error) {
+        console.warn('[Background] Error clearing usage timer after blocking:', error);
+      }
     }
   } catch (error) {
     console.error('[Background] Error during navigation blocking check:', error);
@@ -236,34 +257,88 @@ async function handleWindowFocusChanged(windowId) {
 
 /**
  * Core tab activity handler that determines whether to start or stop tracking.
+ * FIXED: Now properly handles cases where user navigates within the same distracting site.
  * @param {number} tabId - The tab ID
  * @param {string} url - The tab URL
  * @param {boolean} shouldTrack - Whether tracking should be active
  */
 async function handleTabActivity(tabId, url, shouldTrack) {
+  console.log(`[Background] handleTabActivity: tab=${tabId}, url=${url}, shouldTrack=${shouldTrack}`);
+  
   try {
+    // Ensure distraction detector is initialized before checking
+    try {
+      await initializeDistractionDetector();
+    } catch (initError) {
+      console.warn('[Background] Failed to initialize distraction detector:', initError);
+    }
+    
     // Check if URL is a distracting site
     const distractionCheck = checkIfUrlIsDistracting(url);
     const { isMatch, siteId } = distractionCheck;
+    
+    console.log(`[Background] Distraction check result:`, { isMatch, siteId, url });
 
     if (!shouldTrack || !isMatch || !siteId) {
       // Stop tracking if we're not supposed to track or if it's not a distracting site
+      console.log('[Background] Stopping tracking (not shouldTrack or not distracting site)');
       await stopTracking();
+      // Clear any existing usage timer
+      try {
+        await browser.alarms.clear('usageTimer');
+        console.log('[Background] Cleared usage timer alarm');
+      } catch (error) {
+        console.warn('[Background] Error clearing usage timer:', error);
+      }
+      
+      // Update badge for the current tab (will clear it if not distracting)
+      try {
+        await updateBadge(tabId);
+      } catch (error) {
+        console.warn('[Background] Error updating badge after stopping tracking:', error);
+      }
       return;
     }
 
     console.log(`[Background] Detected distracting site: ${siteId} (${url})`);
 
-    // Start tracking for this site
-    const trackingStarted = await startTracking(siteId, tabId);
+    // FIXED: Check if we're already tracking the same site in the same tab
+    const currentTrackingInfo = await getCurrentTrackingInfo();
+    if (currentTrackingInfo.isTracking && 
+        currentTrackingInfo.siteId === siteId && 
+        currentTrackingInfo.tabId === tabId) {
+      console.log(`[Background] Already tracking site ${siteId} in tab ${tabId}, continuing existing session`);
+      // Update badge but don't restart tracking
+      try {
+        await updateBadge(tabId);
+      } catch (error) {
+        console.warn('[Background] Error updating badge for continued tracking:', error);
+      }
+      return;
+    }
+
+    // Start tracking for this site and tab
+    const trackingStarted = await startTracking(tabId, siteId);
+    console.log(`[Background] Tracking started: ${trackingStarted}`);
     
     if (trackingStarted) {
       // Create recurring alarm for usage updates
       try {
-        await browser.alarms.create('usageTimer', { periodInMinutes: 1 });
-        console.log('[Background] Created usage timer alarm');
+        // Clear any existing timer first to avoid duplicates
+        await browser.alarms.clear('usageTimer');
+        // FIXED: Use 15-second intervals for more accurate tracking in Firefox
+        // Firefox doesn't have Chrome's 1-minute minimum limitation for packed extensions
+        await browser.alarms.create('usageTimer', { periodInMinutes: 0.25 }); // 15 seconds
+        console.log('[Background] Created usage timer alarm (15 second intervals)');
       } catch (error) {
         console.warn('[Background] Error creating usage timer alarm:', error);
+      }
+      
+      // Update badge for the current tab
+      try {
+        await updateBadge(tabId);
+      } catch (error) {
+        console.warn('[Background] Error updating badge after starting tracking:', error);
       }
     }
 
@@ -399,6 +474,29 @@ async function handleMessage(message, _sender, _sendResponse) {
         
         // Refresh badge for current tab since limits may have changed
         await _refreshCurrentTabBadge();
+        
+        // CRITICAL: Re-evaluate current tab blocking status immediately
+        // This fixes the issue where updated limits don't take effect until next navigation
+        try {
+          const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+          if (activeTab && activeTab.url) {
+            console.log(`[Background] Re-evaluating blocking status for current tab after limit update`);
+            
+            // Check if current tab would be blocked with new limits
+            const blockResult = await checkAndBlockSite(activeTab.id, activeTab.url);
+            console.log(`[Background] Re-evaluation result:`, blockResult);
+            
+            // If site is no longer blocked and we're on timeout page, we can't redirect back
+            // automatically since we don't store the original URL. Instead, just refresh the badge.
+            if (!blockResult.shouldBlock && activeTab.url.includes('ui/timeout/timeout.html')) {
+              console.log(`[Background] Site no longer blocked but currently on timeout page. User can navigate back manually.`);
+              // Note: We could store original URL in the future for automatic redirect
+            }
+          }
+        } catch (error) {
+          console.warn('[Background] Error re-evaluating blocking status after limit update:', error);
+          // Don't fail the whole operation if re-evaluation fails
+        }
         
         return { 
           success: true, 

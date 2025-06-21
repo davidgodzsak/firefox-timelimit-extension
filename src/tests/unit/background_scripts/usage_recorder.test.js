@@ -11,8 +11,8 @@ jest.unstable_mockModule('../../../background_scripts/usage_storage.js', () => (
   updateUsageStats: jest.fn(),
 }));
 
-// Mock browser.storage.session
-const mockSessionStorage = {
+// Mock browser.storage.local (used for session-like storage)
+const mockLocalStorage = {
   data: {},
   get: jest.fn(),
   set: jest.fn(),
@@ -22,7 +22,7 @@ const mockSessionStorage = {
 
 global.browser = {
   storage: {
-    session: mockSessionStorage,
+    local: mockLocalStorage,
   },
 };
 
@@ -44,7 +44,7 @@ describe('UsageRecorder (Event-Driven)', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    mockSessionStorage.data = {};
+    mockLocalStorage.data = {};
     
     // Set up time mocking
     currentTime = 1620000000000; // Fixed timestamp for tests
@@ -54,33 +54,33 @@ describe('UsageRecorder (Event-Driven)', () => {
     getUsageStats.mockResolvedValue({});
     updateUsageStats.mockResolvedValue(true);
 
-    // Set up session storage mocks
-    mockSessionStorage.get.mockImplementation((keys) => {
+    // Set up local storage mocks (used for session-like storage)
+    mockLocalStorage.get.mockImplementation((keys) => {
       const result = {};
       const keysArray = Array.isArray(keys) ? keys : [keys];
       keysArray.forEach(key => {
-        if (mockSessionStorage.data[key] !== undefined) {
-          result[key] = mockSessionStorage.data[key];
+        if (mockLocalStorage.data[key] !== undefined) {
+          result[key] = mockLocalStorage.data[key];
         }
       });
       return Promise.resolve(result);
     });
 
-    mockSessionStorage.set.mockImplementation((data) => {
-      Object.assign(mockSessionStorage.data, data);
+    mockLocalStorage.set.mockImplementation((data) => {
+      Object.assign(mockLocalStorage.data, data);
       return Promise.resolve();
     });
 
-    mockSessionStorage.remove.mockImplementation((keys) => {
+    mockLocalStorage.remove.mockImplementation((keys) => {
       const keysArray = Array.isArray(keys) ? keys : [keys];
       keysArray.forEach(key => {
-        delete mockSessionStorage.data[key];
+        delete mockLocalStorage.data[key];
       });
       return Promise.resolve();
     });
 
-    mockSessionStorage.clear.mockImplementation(() => {
-      mockSessionStorage.data = {};
+    mockLocalStorage.clear.mockImplementation(() => {
+      mockLocalStorage.data = {};
       return Promise.resolve();
     });
   });
@@ -90,12 +90,14 @@ describe('UsageRecorder (Event-Driven)', () => {
       const result = await startTracking(123, 'site1');
       
       expect(result).toBe(true);
-      expect(mockSessionStorage.set).toHaveBeenCalledWith({
-        tracking_siteId: 'site1',
-        tracking_startTime: currentTime,
-        tracking_tabId: 123,
-        tracking_isActive: true,
-      });
+      expect(mockLocalStorage.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_tracking_siteId: 'site1',
+          session_tracking_startTime: currentTime,
+          session_tracking_tabId: 123,
+          session_tracking_isActive: true,
+        })
+      );
       
       // Should record the site open event
       expect(updateUsageStats).toHaveBeenCalledWith(
@@ -110,11 +112,11 @@ describe('UsageRecorder (Event-Driven)', () => {
 
     it('should stop previous tracking before starting new tracking', async () => {
       // Set up existing tracking state
-      mockSessionStorage.data = {
-        tracking_siteId: 'oldSite',
-        tracking_startTime: currentTime - 5000,
-        tracking_tabId: 456,
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'oldSite',
+        session_tracking_startTime: currentTime - 5000,
+        session_tracking_tabId: 456,
+        session_tracking_isActive: true,
       };
 
       // Start new tracking
@@ -152,11 +154,11 @@ describe('UsageRecorder (Event-Driven)', () => {
       expect(result1).toBe(false);
       expect(result2).toBe(false);
       expect(result3).toBe(false);
-      expect(mockSessionStorage.set).not.toHaveBeenCalled();
+      expect(mockLocalStorage.set).not.toHaveBeenCalled();
     });
 
     it('should handle storage errors gracefully', async () => {
-      mockSessionStorage.set.mockRejectedValue(new Error('Storage error'));
+      mockLocalStorage.set.mockRejectedValue(new Error('Storage error'));
 
       const result = await startTracking(123, 'site1');
 
@@ -167,11 +169,11 @@ describe('UsageRecorder (Event-Driven)', () => {
   describe('stopTracking', () => {
     it('should stop active tracking and record final time', async () => {
       // Set up active tracking
-      mockSessionStorage.data = {
-        tracking_siteId: 'site1',
-        tracking_startTime: currentTime - 3000,
-        tracking_tabId: 123,
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_startTime: currentTime - 3000,
+        session_tracking_tabId: 123,
+        session_tracking_isActive: true,
       };
 
       const totalTime = await stopTracking();
@@ -185,7 +187,7 @@ describe('UsageRecorder (Event-Driven)', () => {
           opens: 0,
         })
       );
-      expect(mockSessionStorage.remove).toHaveBeenCalled();
+      expect(mockLocalStorage.remove).toHaveBeenCalled();
     });
 
     it('should handle no active tracking gracefully', async () => {
@@ -193,14 +195,14 @@ describe('UsageRecorder (Event-Driven)', () => {
 
       expect(totalTime).toBe(0);
       expect(updateUsageStats).not.toHaveBeenCalled();
-      expect(mockSessionStorage.remove).toHaveBeenCalled(); // Should still clear state
+      expect(mockLocalStorage.remove).toHaveBeenCalled(); // Should still clear state
     });
 
     it('should handle incomplete tracking state', async () => {
       // Set up incomplete tracking state
-      mockSessionStorage.data = {
-        tracking_siteId: 'site1',
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_isActive: true,
         // Missing startTime
       };
 
@@ -208,23 +210,23 @@ describe('UsageRecorder (Event-Driven)', () => {
 
       expect(totalTime).toBe(0);
       expect(updateUsageStats).not.toHaveBeenCalled();
-      expect(mockSessionStorage.remove).toHaveBeenCalled();
+      expect(mockLocalStorage.remove).toHaveBeenCalled();
     });
 
     it('should handle storage errors gracefully', async () => {
-      mockSessionStorage.data = {
-        tracking_siteId: 'site1',
-        tracking_startTime: currentTime - 1000,
-        tracking_tabId: 123,
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_startTime: currentTime - 1000,
+        session_tracking_tabId: 123,
+        session_tracking_isActive: true,
       };
       
-      mockSessionStorage.get.mockRejectedValue(new Error('Storage error'));
+      mockLocalStorage.get.mockRejectedValue(new Error('Storage error'));
 
       const totalTime = await stopTracking();
 
       expect(totalTime).toBe(0);
-      expect(mockSessionStorage.remove).toHaveBeenCalled();
+      expect(mockLocalStorage.remove).toHaveBeenCalled();
     });
   });
 
@@ -232,11 +234,11 @@ describe('UsageRecorder (Event-Driven)', () => {
     it('should update usage for active tracking and reset start time', async () => {
       // Set up active tracking
       const startTime = currentTime - 2000;
-      mockSessionStorage.data = {
-        tracking_siteId: 'site1',
-        tracking_startTime: startTime,
-        tracking_tabId: 123,
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_startTime: startTime,
+        session_tracking_tabId: 123,
+        session_tracking_isActive: true,
       };
 
       const totalTime = await updateUsage();
@@ -252,9 +254,11 @@ describe('UsageRecorder (Event-Driven)', () => {
       );
       
       // Should reset start time
-      expect(mockSessionStorage.set).toHaveBeenCalledWith({
-        tracking_startTime: currentTime,
-      });
+      expect(mockLocalStorage.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_tracking_startTime: currentTime,
+        })
+      );
     });
 
     it('should handle no active tracking', async () => {
@@ -262,33 +266,33 @@ describe('UsageRecorder (Event-Driven)', () => {
 
       expect(totalTime).toBe(0);
       expect(updateUsageStats).not.toHaveBeenCalled();
-      expect(mockSessionStorage.set).not.toHaveBeenCalled();
+      expect(mockLocalStorage.set).not.toHaveBeenCalled();
     });
 
     it('should handle zero elapsed time', async () => {
       // Set up tracking with current time as start time (no elapsed time)
-      mockSessionStorage.data = {
-        tracking_siteId: 'site1',
-        tracking_startTime: currentTime,
-        tracking_tabId: 123,
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_startTime: currentTime,
+        session_tracking_tabId: 123,
+        session_tracking_isActive: true,
       };
 
       const totalTime = await updateUsage();
 
       expect(totalTime).toBe(0);
       expect(updateUsageStats).not.toHaveBeenCalled();
-      expect(mockSessionStorage.set).not.toHaveBeenCalled();
+      expect(mockLocalStorage.set).not.toHaveBeenCalled();
     });
   });
 
   describe('getCurrentTrackingInfo', () => {
     it('should return current tracking information', async () => {
-      mockSessionStorage.data = {
-        tracking_siteId: 'site1',
-        tracking_startTime: currentTime,
-        tracking_tabId: 123,
-        tracking_isActive: true,
+      mockLocalStorage.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_startTime: currentTime,
+        session_tracking_tabId: 123,
+        session_tracking_isActive: true,
       };
 
       const info = await getCurrentTrackingInfo();
@@ -313,7 +317,7 @@ describe('UsageRecorder (Event-Driven)', () => {
     });
 
     it('should handle storage errors gracefully', async () => {
-      mockSessionStorage.get.mockRejectedValue(new Error('Storage error'));
+      mockLocalStorage.get.mockRejectedValue(new Error('Storage error'));
 
       const info = await getCurrentTrackingInfo();
 

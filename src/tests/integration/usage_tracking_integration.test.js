@@ -23,15 +23,12 @@ jest.unstable_mockModule('../../background_scripts/badge_manager.js', () => ({
 // Mock browser APIs
 const mockBrowser = {
   storage: {
-    session: {
+    local: {
       data: {},
       get: jest.fn(),
       set: jest.fn(),
       remove: jest.fn(),
-    },
-    local: {
-      get: jest.fn(),
-      set: jest.fn(),
+      clear: jest.fn(),
     },
     onChanged: {
       addListener: jest.fn(),
@@ -78,34 +75,39 @@ describe('Usage Tracking Integration', () => {
   beforeEach(async () => {
     // Reset all mocks
     jest.clearAllMocks();
-    mockBrowser.storage.session.data = {};
+    mockBrowser.storage.local.data = {};
 
     // Set up time mocking
     currentTime = 1620000000000;
     global.Date.now = jest.fn(() => currentTime);
 
-    // Set up session storage mocks
-    mockBrowser.storage.session.get.mockImplementation((keys) => {
+    // Set up local storage mocks (used for session-like storage)
+    mockBrowser.storage.local.get.mockImplementation((keys) => {
       const result = {};
       const keysArray = Array.isArray(keys) ? keys : [keys];
       keysArray.forEach(key => {
-        if (mockBrowser.storage.session.data[key] !== undefined) {
-          result[key] = mockBrowser.storage.session.data[key];
+        if (mockBrowser.storage.local.data[key] !== undefined) {
+          result[key] = mockBrowser.storage.local.data[key];
         }
       });
       return Promise.resolve(result);
     });
 
-    mockBrowser.storage.session.set.mockImplementation((data) => {
-      Object.assign(mockBrowser.storage.session.data, data);
+    mockBrowser.storage.local.set.mockImplementation((data) => {
+      Object.assign(mockBrowser.storage.local.data, data);
       return Promise.resolve();
     });
 
-    mockBrowser.storage.session.remove.mockImplementation((keys) => {
+    mockBrowser.storage.local.remove.mockImplementation((keys) => {
       const keysArray = Array.isArray(keys) ? keys : [keys];
       keysArray.forEach(key => {
-        delete mockBrowser.storage.session.data[key];
+        delete mockBrowser.storage.local.data[key];
       });
+      return Promise.resolve();
+    });
+
+    mockBrowser.storage.local.clear.mockImplementation(() => {
+      mockBrowser.storage.local.data = {};
       return Promise.resolve();
     });
 
@@ -338,7 +340,7 @@ describe('Usage Tracking Integration', () => {
   describe('Error Scenarios', () => {
     it('should handle storage errors gracefully', async () => {
       // Mock storage error
-      mockBrowser.storage.session.set.mockRejectedValue(new Error('Storage error'));
+      mockBrowser.storage.local.set.mockRejectedValue(new Error('Storage error'));
 
       const success = await startTracking(123, 'site1');
       expect(success).toBe(false);
@@ -364,9 +366,9 @@ describe('Usage Tracking Integration', () => {
 
     it('should recover from invalid tracking state', async () => {
       // Set up invalid tracking state directly
-      mockBrowser.storage.session.data = {
-        tracking_siteId: 'site1',
-        tracking_isActive: true,
+      mockBrowser.storage.local.data = {
+        session_tracking_siteId: 'site1',
+        session_tracking_isActive: true,
         // Missing required fields like startTime
       };
 

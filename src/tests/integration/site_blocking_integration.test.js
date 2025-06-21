@@ -45,8 +45,10 @@ jest.unstable_mockModule('../../background_scripts/distraction_detector.js', () 
 
 // Mock site blocker
 const mockHandlePotentialRedirect = jest.fn();
+const mockCheckAndBlockSite = jest.fn();
 jest.unstable_mockModule('../../background_scripts/site_blocker.js', () => ({
   handlePotentialRedirect: mockHandlePotentialRedirect,
+  checkAndBlockSite: mockCheckAndBlockSite,
 }));
 
 // Mock badge manager
@@ -142,6 +144,7 @@ describe('Site Blocking Integration', () => {
     mockGetUsageStats.mockReset();
     mockCheckIfUrlIsDistracting.mockReset();
     mockHandlePotentialRedirect.mockReset();
+    mockCheckAndBlockSite.mockReset();
     mockTabsUpdate.mockReset();
     mockTabsGet.mockReset();
     mockTabsQuery.mockReset();

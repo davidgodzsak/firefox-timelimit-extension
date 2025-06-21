@@ -321,8 +321,6 @@ describe('Performance and Error Handling Integration', () => {
       // First call
       await badgeManager.updateBadge(1);
 
-      const firstCallCount = global.browser.action.setBadgeText.mock.calls.length;
-
       // Second call
       await badgeManager.updateBadge(1);
 

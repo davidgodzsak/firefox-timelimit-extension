@@ -13,10 +13,10 @@
     <!-- Header with title and settings link -->
     <header class="popup-header">
       <h1 class="popup-title">Distraction Limiter</h1>
-      <button class="settings-btn" id="settingsBtn" title="Open Settings">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m8.49 8.49l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m8.49-8.49l4.24-4.24"></path>
+      <button class="btn btn-icon" id="settingsBtn" title="Open Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
     </header>
@@ -28,78 +28,178 @@
     </div>
 
     <!-- Existing limits display (shown when site already has limits) -->
-    <div class="existing-limits" id="existingLimits" style="display: none;">
-      <h3>Current Limits</h3>
-      <div class="limit-item" id="timeLimitDisplay"></div>
-      <div class="limit-item" id="openLimitDisplay"></div>
-      <button class="btn-secondary btn-small" id="editLimitsBtn">Edit Limits</button>
+    <div class="existing-limits-section" id="existingLimits" style="display: none;">
+      <div class="section-header">
+        <h3 class="section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12,6 12,12 16,14"/>
+          </svg>
+          Current Usage & Limits
+        </h3>
+      </div>
+      
+      <div class="limits-content">
+        <!-- Usage Progress Section -->
+        <div class="usage-section">
+          <div class="progress-item" id="timeProgress" style="display: none;">
+            <div class="progress-header">
+              <div class="progress-label">
+                <span class="progress-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12,6 12,12 16,14"/>
+                  </svg>
+                </span>
+                <span class="progress-text">Time Used Today</span>
+              </div>
+              <span class="progress-value" id="timeProgressValue">0 / 30 min</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="timeProgressFill" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <div class="progress-item" id="openProgress" style="display: none;">
+            <div class="progress-header">
+              <div class="progress-label">
+                <span class="progress-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <polyline points="9,9 9,15"/>
+                    <polyline points="15,9 15,15"/>
+                  </svg>
+                </span>
+                <span class="progress-text">Opens Used Today</span>
+              </div>
+              <span class="progress-value" id="openProgressValue">0 / 5</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="openProgressFill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Limits Display -->
+        <div class="limits-display">
+          <div class="limit-item" id="timeLimitDisplay"></div>
+          <div class="limit-item" id="openLimitDisplay"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Add/Edit limits form -->
-    <form class="limits-form" id="limitsForm">
-      <h3 id="formTitle">Add Limits for This Site</h3>
+    <div class="limits-form-section" id="limitsFormSection">
+      <div class="section-header">
+        <h3 class="section-title" id="formTitle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+          Add Limits for This Site
+        </h3>
+      </div>
       
-      <!-- URL Pattern Field -->
-      <div class="form-group">
-        <label for="urlPattern">Site Pattern:</label>
-        <input type="text" id="urlPattern" name="urlPattern" placeholder="e.g., example.com" required>
-        <div class="field-help">The domain or URL pattern to limit</div>
-      </div>
-
-      <!-- Time Limit Field -->
-      <div class="form-group">
-        <label for="timeLimit">Daily Time Limit (minutes):</label>
-        <input type="number" id="timeLimit" name="timeLimit" min="1" max="1440" placeholder="e.g., 30">
-        <div class="field-help">Maximum time per day (optional)</div>
-      </div>
-
-      <!-- Open Count Limit Field -->
-      <div class="form-group">
-        <label for="openLimit">Daily Open Limit:</label>
-        <input type="number" id="openLimit" name="openLimit" min="1" max="100" placeholder="e.g., 5">
-        <div class="field-help">Maximum opens per day (optional)</div>
-      </div>
-
-      <!-- Quick preset buttons -->
-      <div class="quick-presets">
-        <div class="preset-label">Quick Presets:</div>
-        <div class="preset-buttons">
-          <button type="button" class="btn-preset" data-time="15" data-opens="3">15min / 3 opens</button>
-          <button type="button" class="btn-preset" data-time="30" data-opens="5">30min / 5 opens</button>
-          <button type="button" class="btn-preset" data-time="60" data-opens="10">1hr / 10 opens</button>
+      <form class="limits-form" id="limitsForm">
+        <!-- URL Pattern Field -->
+        <div class="form-group">
+          <label class="form-label" for="urlPattern">Site Pattern:</label>
+          <input type="text" class="form-input" id="urlPattern" name="urlPattern" placeholder="e.g., example.com" required>
+          <div class="form-help">The domain or URL pattern to limit</div>
         </div>
-      </div>
 
-      <!-- Validation errors -->
-      <div class="error-message" id="errorMessage" style="display: none;"></div>
+        <!-- Time Limit Field -->
+        <div class="form-group">
+          <label class="form-label" for="timeLimit">Daily Time Limit (minutes):</label>
+          <input type="number" class="form-input" id="timeLimit" name="timeLimit" min="1" max="1440" placeholder="e.g., 30">
+          <div class="form-help">Maximum time per day (optional)</div>
+        </div>
 
-      <!-- Form actions -->
-      <div class="form-actions">
-        <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
-        <button type="submit" class="btn-primary" id="submitBtn">Add Limits</button>
-      </div>
-    </form>
+        <!-- Open Count Limit Field -->
+        <div class="form-group">
+          <label class="form-label" for="openLimit">Daily Open Limit:</label>
+          <input type="number" class="form-input" id="openLimit" name="openLimit" min="1" max="100" placeholder="e.g., 5">
+          <div class="form-help">Maximum opens per day (optional)</div>
+        </div>
+
+        <!-- Quick preset buttons -->
+        <div class="quick-presets">
+          <div class="preset-label">Quick Presets:</div>
+          <div class="preset-buttons">
+            <button type="button" class="btn-preset" data-time="15" data-opens="3">15min / 3 opens</button>
+            <button type="button" class="btn-preset" data-time="30" data-opens="5">30min / 5 opens</button>
+            <button type="button" class="btn-preset" data-time="60" data-opens="10">1hr / 10 opens</button>
+          </div>
+        </div>
+
+        <!-- Validation errors -->
+        <div class="error-message" id="errorMessage" style="display: none;"></div>
+
+        <!-- Form actions -->
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancelBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20,6 9,17 4,12"/>
+            </svg>
+            Add Limits
+          </button>
+        </div>
+      </form>
+    </div>
 
     <!-- Success message -->
     <div class="success-message" id="successMessage" style="display: none;">
-      <div class="success-icon">✓</div>
-      <div class="success-text">Limits added successfully!</div>
-      <button class="btn-primary" id="closeBtn">Close</button>
+      <div class="success-content">
+        <div class="success-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20,6 9,17 4,12"/>
+          </svg>
+        </div>
+        <div class="success-text">Limits added successfully!</div>
+        <button class="btn btn-primary" id="closeBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20,6 9,17 4,12"/>
+          </svg>
+          Close
+        </button>
+      </div>
     </div>
 
     <!-- Non-distracting site message -->
     <div class="info-message" id="infoMessage" style="display: none;">
-      <div class="info-icon">ℹ</div>
-      <div class="info-text">
-        <h3>Add New Site Limit</h3>
-        <p>This site doesn't have any limits yet. You can add time and/or open count limits to help control your usage.</p>
+      <div class="info-content">
+        <div class="info-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </div>
+        <div class="info-text">
+          <h3>Add New Site Limit</h3>
+          <p>This site doesn't have any limits yet. You can add time and/or open count limits to help control your usage.</p>
+        </div>
       </div>
     </div>
 
     <!-- Loading indicator -->
     <div class="loading" id="loadingIndicator">
-      <div class="spinner"></div>
-      <div class="loading-text">Loading...</div>
+      <div class="loading-content">
+        <div class="spinner">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+          </svg>
+        </div>
+        <div class="loading-text">Loading...</div>
+      </div>
     </div>
   </div>
 

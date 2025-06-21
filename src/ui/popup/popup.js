@@ -9,7 +9,6 @@ let elements = {};
 
 // State management
 let currentPageInfo = null;
-let isEditMode = false;
 
 // Performance optimization: Cache frequently accessed data
 let _dataCache = {
@@ -47,13 +46,21 @@ function initializeElements() {
       pageUrl: document.getElementById('pageUrl'),
       pageStatus: document.getElementById('pageStatus'),
       
-      // Existing limits display
+      // Existing limits display - updated for new structure
       existingLimits: document.getElementById('existingLimits'),
       timeLimitDisplay: document.getElementById('timeLimitDisplay'),
       openLimitDisplay: document.getElementById('openLimitDisplay'),
-      editLimitsBtn: document.getElementById('editLimitsBtn'),
       
-      // Form elements
+      // Progress bars
+      timeProgress: document.getElementById('timeProgress'),
+      timeProgressValue: document.getElementById('timeProgressValue'),
+      timeProgressFill: document.getElementById('timeProgressFill'),
+      openProgress: document.getElementById('openProgress'),
+      openProgressValue: document.getElementById('openProgressValue'),
+      openProgressFill: document.getElementById('openProgressFill'),
+      
+      // Form elements - updated for new structure
+      limitsFormSection: document.getElementById('limitsFormSection'),
       limitsForm: document.getElementById('limitsForm'),
       formTitle: document.getElementById('formTitle'),
       urlPattern: document.getElementById('urlPattern'),
@@ -117,9 +124,6 @@ function setupEventListeners() {
     if (elements.closeBtn) {
       elements.closeBtn.addEventListener('click', closePopup);
     }
-    if (elements.editLimitsBtn) {
-      elements.editLimitsBtn.addEventListener('click', handleEditLimits);
-    }
     
     // Preset buttons with event delegation for better performance
     if (elements.presetButtons.length > 0) {
@@ -159,7 +163,7 @@ function setupEventListeners() {
  * @param {string} field - The field being validated
  * @param {string} value - The current field value
  */
-function debouncedValidation(field, value) {
+function debouncedValidation(field, _value) {
   // Clear existing timer
   if (_validationTimers[field]) {
     clearTimeout(_validationTimers[field]);
@@ -174,13 +178,14 @@ function debouncedValidation(field, value) {
 
 /**
  * Shows/hides different sections of the popup UI with smooth transitions.
+ * Updated for new HTML structure.
  * @private
  * @param {string} section - The section to show ('loading', 'form', 'existing', 'success', 'info')
  */
 function showSection(section) {
-  // Batch DOM operations for better performance
+  // Updated section elements for new structure
   const sectionsToHide = [
-    'loadingIndicator', 'limitsForm', 'existingLimits', 
+    'loadingIndicator', 'limitsFormSection', 'existingLimits', 
     'successMessage', 'infoMessage', 'errorMessage'
   ];
   
@@ -197,12 +202,12 @@ function showSection(section) {
     switch (section) {
       case 'loading':
         if (elements.loadingIndicator) {
-          elements.loadingIndicator.style.display = 'flex';
+          elements.loadingIndicator.style.display = 'block';
         }
         break;
       case 'form':
-        if (elements.limitsForm) {
-          elements.limitsForm.style.display = 'block';
+        if (elements.limitsFormSection) {
+          elements.limitsFormSection.style.display = 'block';
         }
         break;
       case 'existing':
@@ -212,12 +217,12 @@ function showSection(section) {
         break;
       case 'success':
         if (elements.successMessage) {
-          elements.successMessage.style.display = 'flex';
+          elements.successMessage.style.display = 'block';
         }
         break;
       case 'info':
         if (elements.infoMessage) {
-          elements.infoMessage.style.display = 'flex';
+          elements.infoMessage.style.display = 'block';
         }
         break;
     }
@@ -317,19 +322,19 @@ async function loadCurrentPageInfo() {
       }
       
       if (data.isDistractingSite && data.siteInfo) {
-        // Site already has limits
+        // Site already has limits - show existing limits only
         if (elements.pageStatus) {
           elements.pageStatus.textContent = 'Site has configured limits';
         }
         displayExistingLimits(data.siteInfo);
         showSection('existing');
       } else {
-        // Site doesn't have limits
+        // Site doesn't have limits - show add form directly
         if (elements.pageStatus) {
           elements.pageStatus.textContent = 'No limits configured';
         }
         setupNewSiteForm(data.hostname || extractHostname(data.url));
-        showSection('info');
+        showSection('form');
       }
     });
     
@@ -362,68 +367,134 @@ async function loadCurrentPageInfo() {
 function extractHostname(url) {
   try {
     return new URL(url).hostname;
-  } catch (error) {
+  } catch {
     return url;
   }
 }
 
 /**
- * Displays existing limits for a site.
+ * Displays existing limits with enhanced usage data and functional progress bars.
+ * Updated to match new HTML structure and show real usage data.
  * @private
- * @param {Object} siteInfo - The site information object
+ * @param {Object} siteInfo - The site information containing limits and usage
  */
 function displayExistingLimits(siteInfo) {
-  // Display time limit
+  console.log('[Popup] Displaying existing limits:', siteInfo);
+  
+  // Display time limit and progress
   if (siteInfo.dailyLimitSeconds > 0) {
-    const minutes = Math.round(siteInfo.dailyLimitSeconds / 60);
-    elements.timeLimitDisplay.innerHTML = `
-      <span>Time Limit:</span>
-      <strong>${minutes} minute${minutes !== 1 ? 's' : ''}</strong>
-    `;
-    elements.timeLimitDisplay.style.display = 'flex';
+    const limitMinutes = Math.round(siteInfo.dailyLimitSeconds / 60);
+    const usedMinutes = Math.round((siteInfo.todaySeconds || 0) / 60);
+    const percentage = Math.min((usedMinutes / limitMinutes) * 100, 100);
+    
+    // Update time limit display
+    if (elements.timeLimitDisplay) {
+      elements.timeLimitDisplay.innerHTML = `
+        <span>Daily Time Limit:</span>
+        <strong>${limitMinutes} minute${limitMinutes !== 1 ? 's' : ''}</strong>
+      `;
+      elements.timeLimitDisplay.style.display = 'flex';
+    }
+    
+    // Show time progress with enhanced styling
+    if (elements.timeProgress && elements.timeProgressValue && elements.timeProgressFill) {
+      elements.timeProgressValue.textContent = `${usedMinutes} / ${limitMinutes} min`;
+      elements.timeProgressFill.style.width = `${percentage}%`;
+      
+      // Add visual feedback for approaching/exceeding limits
+      if (percentage >= 100) {
+        elements.timeProgressFill.style.background = 'var(--accent-error)';
+      } else if (percentage >= 80) {
+        elements.timeProgressFill.style.background = 'var(--accent-warning)';
+      } else {
+        elements.timeProgressFill.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))';
+      }
+      
+      elements.timeProgress.style.display = 'block';
+    }
   } else {
-    elements.timeLimitDisplay.style.display = 'none';
+    if (elements.timeLimitDisplay) {
+      elements.timeLimitDisplay.style.display = 'none';
+    }
+    if (elements.timeProgress) {
+      elements.timeProgress.style.display = 'none';
+    }
   }
   
-  // Display open limit
+  // Display open limit and progress
   if (siteInfo.dailyOpenLimit > 0) {
-    elements.openLimitDisplay.innerHTML = `
-      <span>Open Limit:</span>
-      <strong>${siteInfo.dailyOpenLimit} open${siteInfo.dailyOpenLimit !== 1 ? 's' : ''}</strong>
-    `;
-    elements.openLimitDisplay.style.display = 'flex';
+    const usedOpens = siteInfo.todayOpenCount || 0;
+    const percentage = Math.min((usedOpens / siteInfo.dailyOpenLimit) * 100, 100);
+    
+    // Update open limit display
+    if (elements.openLimitDisplay) {
+      elements.openLimitDisplay.innerHTML = `
+        <span>Daily Open Limit:</span>
+        <strong>${siteInfo.dailyOpenLimit} open${siteInfo.dailyOpenLimit !== 1 ? 's' : ''}</strong>
+      `;
+      elements.openLimitDisplay.style.display = 'flex';
+    }
+    
+    // Show open progress with enhanced styling
+    if (elements.openProgress && elements.openProgressValue && elements.openProgressFill) {
+      elements.openProgressValue.textContent = `${usedOpens} / ${siteInfo.dailyOpenLimit}`;
+      elements.openProgressFill.style.width = `${percentage}%`;
+      
+      // Add visual feedback for approaching/exceeding limits
+      if (percentage >= 100) {
+        elements.openProgressFill.style.background = 'var(--accent-error)';
+      } else if (percentage >= 80) {
+        elements.openProgressFill.style.background = 'var(--accent-warning)';
+      } else {
+        elements.openProgressFill.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))';
+      }
+      
+      elements.openProgress.style.display = 'block';
+    }
   } else {
-    elements.openLimitDisplay.style.display = 'none';
+    if (elements.openLimitDisplay) {
+      elements.openLimitDisplay.style.display = 'none';
+    }
+    if (elements.openProgress) {
+      elements.openProgress.style.display = 'none';
+    }
   }
 }
 
 /**
  * Sets up the form for adding limits to a new site.
+ * Updated to match new HTML structure with icons.
  * @private
  * @param {string} hostname - The hostname to pre-fill
  */
 function setupNewSiteForm(hostname) {
-  isEditMode = false;
-  elements.formTitle.textContent = 'Add Limits for This Site';
-  elements.submitBtn.textContent = 'Add Limits';
-  elements.urlPattern.value = hostname;
-  elements.timeLimit.value = '';
-  elements.openLimit.value = '';
-  hideError();
-}
-
-/**
- * Sets up the form for editing existing limits.
- * @private
- * @param {Object} siteInfo - The existing site information
- */
-function setupEditForm(siteInfo) {
-  isEditMode = true;
-  elements.formTitle.textContent = 'Edit Limits';
-  elements.submitBtn.textContent = 'Update Limits';
-  elements.urlPattern.value = siteInfo.urlPattern;
-  elements.timeLimit.value = siteInfo.dailyLimitSeconds > 0 ? Math.round(siteInfo.dailyLimitSeconds / 60) : '';
-  elements.openLimit.value = siteInfo.dailyOpenLimit || '';
+  // Update form title with icon (already in HTML)
+  if (elements.formTitle) {
+    elements.formTitle.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      Add Limits for This Site
+    `;
+  }
+  
+  // Update submit button with icon
+  if (elements.submitBtn) {
+    elements.submitBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20,6 9,17 4,12"/>
+      </svg>
+      Add Limits
+    `;
+  }
+  
+  // Pre-fill form
+  if (elements.urlPattern) elements.urlPattern.value = hostname;
+  if (elements.timeLimit) elements.timeLimit.value = '';
+  if (elements.openLimit) elements.openLimit.value = '';
+  
   hideError();
 }
 
@@ -510,7 +581,7 @@ function validateForm() {
 }
 
 /**
- * Handles form submission.
+ * Handles form submission with enhanced error handling.
  * @private
  * @param {Event} event - The form submit event
  */
@@ -536,8 +607,15 @@ async function handleFormSubmit(event) {
   }
   
   try {
+    // Update button state
     elements.submitBtn.disabled = true;
-    elements.submitBtn.textContent = 'Saving...';
+    const originalText = elements.submitBtn.innerHTML;
+    elements.submitBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+      </svg>
+      Saving...
+    `;
     
     const payload = {
       urlPattern: urlPattern,
@@ -548,30 +626,29 @@ async function handleFormSubmit(event) {
       payload.dailyOpenLimit = openLimitCount;
     }
     
-    if (isEditMode && currentPageInfo?.siteInfo?.id) {
-      // Update existing site
-      await sendMessage({
-        action: 'updateDistractingSite',
-        payload: {
-          id: currentPageInfo.siteInfo.id,
-          updates: payload
-        }
-      });
-    } else {
-      // Add new site
-      await sendMessage({
-        action: 'addQuickLimit',
-        payload: payload
-      });
-    }
+    await sendMessage({
+      action: 'addQuickLimit',
+      payload: payload
+    });
+    
+    // Clear cache to force refresh when reopening
+    _dataCache.currentPageData = null;
+    _dataCache.cacheExpiry = 0;
     
     showSection('success');
     
   } catch (error) {
     console.error('[Popup] Error submitting form:', error);
     showError(error.message || 'Failed to save limits. Please try again.');
+    
+    // Restore button state
     elements.submitBtn.disabled = false;
-    elements.submitBtn.textContent = isEditMode ? 'Update Limits' : 'Add Limits';
+    elements.submitBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20,6 9,17 4,12"/>
+      </svg>
+      Add Limits
+    `;
   }
 }
 
@@ -596,26 +673,11 @@ function handlePresetClick(event) {
 }
 
 /**
- * Handles the edit limits button click.
- * @private
- */
-function handleEditLimits() {
-  if (currentPageInfo?.siteInfo) {
-    setupEditForm(currentPageInfo.siteInfo);
-    showSection('form');
-  }
-}
-
-/**
  * Handles the cancel button click.
  * @private
  */
 function handleCancel() {
-  if (currentPageInfo?.isDistractingSite) {
-    showSection('existing');
-  } else {
-    showSection('info');
-  }
+  closePopup();
 }
 
 /**

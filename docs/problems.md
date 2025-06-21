@@ -1,3 +1,9 @@
+- new popup ui/ux is bad, does not follow the design of the existing app
+- new popup should show how much time was spent already, how much opens are already spent
+- new popup does not allow adding a limit easily 
+- new popup has a sun icon instead of cogwheel for settings
+- the checkmark button disappears on the settings screen when I write to the input field
+- timout page does not kick in after the time is spent on the page, seems like it's not even tracking usage
 - the popup does not contain any input for adding a new site limit when opening a site that never had a limit set up
 - the popup button is not following the same design as the buttons in the settings page (edit, delete buttons don't use the icons).
 - popup should not show edit or delete limits buttons, it makes it too easy to make changes and a user could use this to avoid the limits.
@@ -11,4 +17,3 @@
 - settings page enabled/disabled indicator does not have a good contrast with the background, it's barely visible.
 - popup page has a progress bar for both limitations (time, open) but the progress bar is not updated, it does not show how much was used of the allowed time/opens
 - after changing a site's limit to a higher number the site is still blocked not shown again. 
-- background script goes idle. Solution: https://stackoverflow.com/questions/66618136/persistent-service-worker-in-chrome-extension, https://discourse.mozilla.org/t/impossible-to-upgrade-to-manifest-v3-for-extensions-that-require-constant-persistent-listeners/125942/17

@@ -44,7 +44,7 @@ export async function addDistractingSite(siteObject) {
   }
 
   // Validate dailyOpenLimit if provided
-  if (siteObject.hasOwnProperty('dailyOpenLimit') && 
+  if (Object.prototype.hasOwnProperty.call(siteObject, 'dailyOpenLimit') && 
       (typeof siteObject.dailyOpenLimit !== 'number' || siteObject.dailyOpenLimit <= 0)) {
     console.error("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", siteObject.dailyOpenLimit);
     return null;
@@ -58,7 +58,7 @@ export async function addDistractingSite(siteObject) {
   };
 
   // Add dailyOpenLimit if provided
-  if (siteObject.hasOwnProperty('dailyOpenLimit')) {
+  if (Object.prototype.hasOwnProperty.call(siteObject, 'dailyOpenLimit')) {
     newSite.dailyOpenLimit = siteObject.dailyOpenLimit;
   }
 

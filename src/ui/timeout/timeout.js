@@ -53,22 +53,22 @@ let _pageState = {
  * @private
  */
 const ERROR_HANDLERS = {
-    EXTENSION_CONTEXT: (error) => ({
+    EXTENSION_CONTEXT: (_error) => ({
         message: 'Extension was reloaded. Please refresh this page.',
         retry: false,
         level: 'error'
     }),
-    NETWORK: (error) => ({
+    NETWORK: (_error) => ({
         message: 'Connection error. Please check your internet connection.',
         retry: true,
         level: 'warning'
     }),
-    STORAGE: (error) => ({
+    STORAGE: (_error) => ({
         message: 'Failed to load motivational notes. Using default message.',
         retry: true,
         level: 'warning'
     }),
-    DEFAULT: (error) => ({
+    DEFAULT: (_error) => ({
         message: 'An unexpected error occurred. Please try again.',
         retry: true,
         level: 'warning'
@@ -772,25 +772,7 @@ function _setCachedNote(key, note) {
     });
 }
 
-/**
- * Retrieves cached note if available and valid
- * @private
- * @param {string} key - Cache key
- * @returns {Object|null} Cached note or null
- */
-function _getCachedNote(key) {
-    const entry = _pageState.cachedNotes.get(key);
-    if (entry && Date.now() < entry.expires) {
-        return entry.note;
-    }
-    
-    // Remove expired entry
-    if (entry) {
-        _pageState.cachedNotes.delete(key);
-    }
-    
-    return null;
-}
+
 
 /**
  * Optimized timer management to prevent memory leaks
@@ -809,15 +791,7 @@ function _createManagedTimer(callback, delay) {
     return timerId;
 }
 
-/**
- * Clears a managed timer
- * @private
- * @param {number} timerId - Timer ID to clear
- */
-function _clearManagedTimer(timerId) {
-    clearTimeout(timerId);
-    _pageState.timers.delete(timerId);
-}
+
 
 /**
  * Enhanced event listener management with cleanup tracking

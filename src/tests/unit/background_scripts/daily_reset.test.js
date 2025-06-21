@@ -60,7 +60,7 @@ describe('daily_reset.js', () => {
         return Promise.resolve(mockStorageData);
       }
       const result = {};
-      if (mockStorageData.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(mockStorageData, key)) {
         result[key] = mockStorageData[key];
       }
       return Promise.resolve(result);

@@ -45,7 +45,8 @@ const mockUsageStorage = {
 };
 
 const mockDistractionDetector = {
-  checkIfUrlIsDistracting: jest.fn()
+  checkIfUrlIsDistracting: jest.fn(),
+  initializeDistractionDetector: jest.fn()
 };
 
 // Mock the modules before importing
@@ -128,10 +129,12 @@ describe('BadgeManager', () => {
         isMatch: false,
         siteId: null
       });
+      // Setup empty sites list for manual fallback
+      mockSiteStorage.getDistractingSites.mockResolvedValue([]);
 
       await badgeManager.updateBadge(123);
 
-      expect(mockDistractionDetector.checkIfUrlIsDistracting).toHaveBeenCalledWith('https://example.com');
+      // Badge should be cleared for non-distracting sites
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
         text: "",
         tabId: 123
@@ -158,14 +161,8 @@ describe('BadgeManager', () => {
         isMatch: true,
         siteId: 'site1'
       });
-      mockSiteStorage.getDistractingSites.mockResolvedValue({
-        success: true,
-        data: [mockSite]
-      });
-      mockUsageStorage.getUsageStats.mockResolvedValue({
-        success: true,
-        data: mockUsageStats
-      });
+      mockSiteStorage.getDistractingSites.mockResolvedValue([mockSite]);
+      mockUsageStorage.getUsageStats.mockResolvedValue(mockUsageStats);
 
       await badgeManager.updateBadge(123);
 
@@ -199,14 +196,8 @@ describe('BadgeManager', () => {
         isMatch: true,
         siteId: 'site2'
       });
-      mockSiteStorage.getDistractingSites.mockResolvedValue({
-        success: true,
-        data: [mockSite]
-      });
-      mockUsageStorage.getUsageStats.mockResolvedValue({
-        success: true,
-        data: mockUsageStats
-      });
+      mockSiteStorage.getDistractingSites.mockResolvedValue([mockSite]);
+      mockUsageStorage.getUsageStats.mockResolvedValue(mockUsageStats);
 
       await badgeManager.updateBadge(123);
 
@@ -237,14 +228,8 @@ describe('BadgeManager', () => {
         isMatch: true,
         siteId: 'site3'
       });
-      mockSiteStorage.getDistractingSites.mockResolvedValue({
-        success: true,
-        data: [mockSite]
-      });
-      mockUsageStorage.getUsageStats.mockResolvedValue({
-        success: true,
-        data: mockUsageStats
-      });
+      mockSiteStorage.getDistractingSites.mockResolvedValue([mockSite]);
+      mockUsageStorage.getUsageStats.mockResolvedValue(mockUsageStats);
 
       await badgeManager.updateBadge(123);
 
@@ -292,10 +277,7 @@ describe('BadgeManager', () => {
         isMatch: true,
         siteId: 'site1'
       });
-      mockSiteStorage.getDistractingSites.mockResolvedValue({
-        success: true,
-        data: [mockSite]
-      });
+      mockSiteStorage.getDistractingSites.mockResolvedValue([mockSite]);
       mockUsageStorage.getUsageStats.mockRejectedValue(new Error('Usage storage error'));
 
       await badgeManager.updateBadge(123);

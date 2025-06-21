@@ -1,19 +1,53 @@
 /**
  * @file usage_recorder.js
  * @description Handles the recording of time spent and open counts for distracting sites.
- * This module is now stateless and event-driven, using browser.storage.session for
- * tracking state and browser.alarms for timing. Compatible with Manifest V3.
+ * This module is now stateless and event-driven, using browser.storage.local for
+ * tracking state with session-like behavior. Compatible with Manifest V3 Firefox.
  */
 
 import { getUsageStats, updateUsageStats } from './usage_storage.js';
 
-// Session storage keys for tracking state
+// Session storage keys for tracking state - using local storage with session prefix
 const SESSION_KEYS = {
-  SITE_ID: 'tracking_siteId',
-  START_TIME: 'tracking_startTime',
-  TAB_ID: 'tracking_tabId',
-  IS_ACTIVE: 'tracking_isActive'
+  SITE_ID: 'session_tracking_siteId',
+  START_TIME: 'session_tracking_startTime',
+  TAB_ID: 'session_tracking_tabId',
+  IS_ACTIVE: 'session_tracking_isActive',
+  INIT_TIME: 'session_init_time' // Used to detect extension restarts
 };
+
+// Initialize session tracking on module load
+let _initPromise = null;
+
+/**
+ * Initializes the session tracking system and cleans up any stale data
+ * @private
+ */
+async function _initializeSession() {
+  if (_initPromise) return _initPromise;
+  
+  _initPromise = (async () => {
+    try {
+      const currentTime = Date.now();
+      const result = await browser.storage.local.get([SESSION_KEYS.INIT_TIME]);
+      const lastInitTime = result[SESSION_KEYS.INIT_TIME];
+      
+      // If this is a fresh start or extension was restarted, clear old session data
+      if (!lastInitTime || (currentTime - lastInitTime) > 60000) { // 1 minute threshold
+        console.log('[UsageRecorder] Cleaning up stale session data');
+        await _clearTrackingState();
+      }
+      
+      // Set new init time
+      await browser.storage.local.set({ [SESSION_KEYS.INIT_TIME]: currentTime });
+      console.log('[UsageRecorder] Session initialized');
+    } catch (error) {
+      console.error('[UsageRecorder] Error initializing session:', error);
+    }
+  })();
+  
+  return _initPromise;
+}
 
 /**
  * Returns the current date as a string in "YYYY-MM-DD" format for storage keys.
@@ -72,13 +106,15 @@ async function _updateUsageStatsInStorage(siteId, timeIncrementSeconds, isNewOpe
 }
 
 /**
- * Gets the current tracking state from session storage.
+ * Gets the current tracking state from local storage.
  * @private
  * @returns {Promise<Object>} The tracking state object.
  */
 async function _getTrackingState() {
+  await _initializeSession();
+  
   try {
-    const result = await browser.storage.session.get([
+    const result = await browser.storage.local.get([
       SESSION_KEYS.SITE_ID,
       SESSION_KEYS.START_TIME,
       SESSION_KEYS.TAB_ID,
@@ -98,11 +134,13 @@ async function _getTrackingState() {
 }
 
 /**
- * Sets the tracking state in session storage.
+ * Sets the tracking state in local storage.
  * @private
  * @param {Object} state - The state to set.
  */
 async function _setTrackingState(state) {
+  await _initializeSession();
+  
   try {
     const storageData = {};
     if (state.siteId !== undefined) storageData[SESSION_KEYS.SITE_ID] = state.siteId;
@@ -110,7 +148,7 @@ async function _setTrackingState(state) {
     if (state.tabId !== undefined) storageData[SESSION_KEYS.TAB_ID] = state.tabId;
     if (state.isActive !== undefined) storageData[SESSION_KEYS.IS_ACTIVE] = state.isActive;
     
-    await browser.storage.session.set(storageData);
+    await browser.storage.local.set(storageData);
   } catch (error) {
     console.error('[UsageRecorder] Error setting tracking state:', error);
     throw error; // Re-throw so callers can handle appropriately
@@ -118,12 +156,12 @@ async function _setTrackingState(state) {
 }
 
 /**
- * Clears the tracking state from session storage.
+ * Clears the tracking state from local storage.
  * @private
  */
 async function _clearTrackingState() {
   try {
-    await browser.storage.session.remove([
+    await browser.storage.local.remove([
       SESSION_KEYS.SITE_ID,
       SESSION_KEYS.START_TIME,
       SESSION_KEYS.TAB_ID,
@@ -137,12 +175,14 @@ async function _clearTrackingState() {
 
 /**
  * Starts tracking time for a specific distracting site and tab.
- * Stores the tracking state in session storage for persistence across extension restarts.
+ * Stores the tracking state in local storage for persistence across extension restarts.
  * @param {number} tabId - The ID of the tab where the distracting site is open.
  * @param {string} siteId - The ID of the distracting site to start tracking.
  * @returns {Promise<boolean>} True if tracking was started successfully, false otherwise.
  */
 export async function startTracking(tabId, siteId) {
+  console.log(`[UsageRecorder] startTracking called with tabId=${tabId}, siteId=${siteId}`);
+  
   if (!tabId || !siteId) {
     console.warn('[UsageRecorder] Attempted to start tracking without valid tabId and siteId:', { tabId, siteId });
     return false;
@@ -151,23 +191,33 @@ export async function startTracking(tabId, siteId) {
   try {
     // If already tracking something, stop it first to record any accumulated time
     const currentState = await _getTrackingState();
+    console.log('[UsageRecorder] Current tracking state:', currentState);
+    
     if (currentState.isActive) {
       console.log('[UsageRecorder] Stopping previous tracking before starting new session');
       await stopTracking();
     }
 
     const startTime = Date.now();
-    await _setTrackingState({
+    const newState = {
       siteId,
       startTime,
       tabId,
       isActive: true
-    });
+    };
+    
+    console.log('[UsageRecorder] Setting new tracking state:', newState);
+    await _setTrackingState(newState);
 
-    console.log(`[UsageRecorder] Started tracking site: ${siteId} in tab: ${tabId}`);
+    console.log(`[UsageRecorder] Started tracking site: ${siteId} in tab: ${tabId} at ${new Date(startTime).toISOString()}`);
     
     // Record the site open event
+    console.log(`[UsageRecorder] Recording site open event for site: ${siteId}`);
     await _updateUsageStatsInStorage(siteId, 0, true);
+    
+    // Verify the state was set correctly
+    const verifyState = await _getTrackingState();
+    console.log('[UsageRecorder] Verified tracking state after start:', verifyState);
     
     return true;
   } catch (error) {
@@ -224,8 +274,11 @@ export async function stopTracking() {
  * @returns {Promise<number>} The total time spent on the site (in seconds) or 0 if no tracking is active.
  */
 export async function updateUsage() {
+  console.log('[UsageRecorder] updateUsage called by alarm');
+  
   try {
     const state = await _getTrackingState();
+    console.log('[UsageRecorder] Current tracking state in updateUsage:', state);
     
     if (!state.isActive || !state.siteId || !state.startTime) {
       console.log('[UsageRecorder] updateUsage called but no active tracking found');
@@ -233,19 +286,25 @@ export async function updateUsage() {
     }
 
     // Calculate time since last update
-    const elapsedMs = Date.now() - state.startTime;
+    const now = Date.now();
+    const elapsedMs = now - state.startTime;
     let totalTimeSeconds = 0;
+    
+    console.log(`[UsageRecorder] Time calculation: now=${now}, startTime=${state.startTime}, elapsed=${elapsedMs}ms (${elapsedMs/1000}s)`);
     
     if (elapsedMs > 0) {
       console.log(`[UsageRecorder] Recording periodic time slice of ${elapsedMs / 1000}s for site ${state.siteId}`);
       try {
         totalTimeSeconds = await _updateUsageStatsInStorage(state.siteId, elapsedMs / 1000, false);
+        console.log(`[UsageRecorder] Total time for site ${state.siteId} is now: ${totalTimeSeconds}s`);
         
         // Reset start time for next interval, continuing to track the same site
         try {
+          const newStartTime = Date.now();
           await _setTrackingState({
-            startTime: Date.now()
+            startTime: newStartTime
           });
+          console.log(`[UsageRecorder] Reset start time to: ${newStartTime} (${new Date(newStartTime).toISOString()})`);
         } catch (stateError) {
           console.warn('[UsageRecorder] Error resetting start time, will continue tracking:', stateError);
           // Don't fail the entire operation if we can't update the start time
@@ -254,6 +313,8 @@ export async function updateUsage() {
         console.warn('[UsageRecorder] Error updating periodic time slice:', updateError);
         // Don't reset start time if update failed - will retry on next alarm
       }
+    } else {
+      console.warn('[UsageRecorder] Elapsed time is 0 or negative, skipping update');
     }
     
     return totalTimeSeconds;

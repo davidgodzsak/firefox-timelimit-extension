@@ -49,7 +49,8 @@ const mockUsageStorage = {
 };
 
 const mockDistractionDetector = {
-  checkIfUrlIsDistracting: jest.fn()
+  checkIfUrlIsDistracting: jest.fn(),
+  initializeDistractionDetector: jest.fn()
 };
 
 // Mock the modules before importing
@@ -60,9 +61,6 @@ jest.unstable_mockModule('../../background_scripts/distraction_detector.js', () 
 describe('Badge System Integration', () => {
   let mockLocalStorageData;
   let badgeManager;
-  let siteStorage;
-  let usageStorage;
-  let distractionDetector;
   let consoleErrorSpy;
   let uuidCounter;
 
@@ -109,13 +107,13 @@ describe('Badge System Integration', () => {
     mockUsageStorage.getUsageStats.mockReset();
     mockDistractionDetector.checkIfUrlIsDistracting.mockReset();
 
-    // Setup default mocks
+    // Setup default mocks - Updated to match new implementation
     mockSiteStorage.getDistractingSites.mockImplementation(async () => {
-      return { success: true, data: mockLocalStorageData.distractingSites || [] };
+      return mockLocalStorageData.distractingSites || [];
     });
 
     mockUsageStorage.getUsageStats.mockImplementation(async (dateKey) => {
-      return { success: true, data: mockLocalStorageData[`usageStats-${dateKey}`] || {} };
+      return mockLocalStorageData[`usageStats-${dateKey}`] || {};
     });
 
     mockDistractionDetector.checkIfUrlIsDistracting.mockImplementation((url) => {
@@ -134,9 +132,9 @@ describe('Badge System Integration', () => {
     // Import modules fresh
     jest.resetModules();
     badgeManager = await import('../../background_scripts/badge_manager.js');
-    siteStorage = await import('../../background_scripts/site_storage.js');
-    usageStorage = await import('../../background_scripts/usage_storage.js');
-    distractionDetector = await import('../../background_scripts/distraction_detector.js');
+    await import('../../background_scripts/site_storage.js');
+    await import('../../background_scripts/usage_storage.js');
+    await import('../../background_scripts/distraction_detector.js');
   });
 
   afterEach(() => {

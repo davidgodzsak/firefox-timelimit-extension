@@ -8,7 +8,26 @@
 
 import { getDistractingSites } from './site_storage.js';
 import { getUsageStats } from './usage_storage.js';
-import { checkIfUrlIsDistracting } from './distraction_detector.js';
+import { checkIfUrlIsDistracting, initializeDistractionDetector } from './distraction_detector.js';
+
+// Ensure detector is initialized
+let _detectorInitialized = false;
+
+/**
+ * Ensures the distraction detector is initialized
+ * @private
+ */
+async function _ensureDetectorInitialized() {
+  if (!_detectorInitialized) {
+    try {
+      await initializeDistractionDetector();
+      _detectorInitialized = true;
+      console.log('[BadgeManager] Distraction detector initialized successfully');
+    } catch (error) {
+      console.error('[BadgeManager] Failed to initialize distraction detector:', error);
+    }
+  }
+}
 
 /**
  * Returns the current date as a string in "YYYY-MM-DD" format for storage keys.
@@ -100,6 +119,33 @@ function _calculateBadgeText(site, usageStats) {
 }
 
 /**
+ * Checks if a URL is a distracting site using manual pattern matching
+ * This is a fallback when the distraction detector is not available
+ * @private
+ * @param {string} url - The URL to check
+ * @param {Array} sites - Array of distracting sites
+ * @returns {Object} Object with isMatch and siteId properties
+ */
+function _manualDistractionCheck(url, sites) {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    
+    for (const site of sites) {
+      if (site.isEnabled && site.urlPattern && hostname.includes(site.urlPattern)) {
+        console.log(`[BadgeManager] Manual match found: ${hostname} contains ${site.urlPattern} (site ID: ${site.id})`);
+        return { isMatch: true, siteId: site.id };
+      }
+    }
+    
+    return { isMatch: false, siteId: null };
+  } catch (error) {
+    console.warn('[BadgeManager] Error in manual distraction check:', error);
+    return { isMatch: false, siteId: null };
+  }
+}
+
+/**
  * Sets the badge text and background color for a specific tab.
  * @private
  * @param {number} tabId - The tab ID to update
@@ -134,12 +180,17 @@ async function _setBadgeText(tabId, text) {
  * @returns {Promise<void>}
  */
 export async function updateBadge(tabId) {
+  console.log(`[BadgeManager] updateBadge called for tab ${tabId}`);
+  
   if (!tabId) {
     console.warn('[BadgeManager] Invalid tabId provided to updateBadge:', tabId);
     return;
   }
 
   try {
+    // Ensure distraction detector is initialized
+    await _ensureDetectorInitialized();
+    
     // Get tab information
     const tab = await browser.tabs.get(tabId);
     if (!tab || !tab.url) {
@@ -147,38 +198,47 @@ export async function updateBadge(tabId) {
       return;
     }
 
+    console.log(`[BadgeManager] Processing tab ${tabId} with URL: ${tab.url}`);
+
     // Skip internal pages
     if (tab.url.startsWith('chrome://') || 
         tab.url.startsWith('moz-extension://') || 
         tab.url.startsWith('about:')) {
+      console.log(`[BadgeManager] Skipping internal page: ${tab.url}`);
       await _setBadgeText(tabId, "");
       return;
     }
 
-    // Check if URL is a distracting site
-    const distractionCheck = checkIfUrlIsDistracting(tab.url);
+    // Get sites data first for fallback checking
+    const sites = await getDistractingSites();
+    console.log(`[BadgeManager] Retrieved ${sites.length} sites from storage`);
+
+    // Check if URL is a distracting site (with fallback)
+    let distractionCheck = checkIfUrlIsDistracting(tab.url);
+    console.log(`[BadgeManager] Primary distraction check result:`, distractionCheck);
+    
+    // If primary check failed due to initialization, use manual fallback
+    if (!distractionCheck.isMatch && !distractionCheck.siteId) {
+      console.log(`[BadgeManager] Primary check failed, trying manual fallback`);
+      distractionCheck = _manualDistractionCheck(tab.url, sites);
+      console.log(`[BadgeManager] Manual distraction check result:`, distractionCheck);
+    }
+    
     if (!distractionCheck.isMatch || !distractionCheck.siteId) {
       // Not a distracting site, clear badge
+      console.log(`[BadgeManager] Not a distracting site, clearing badge for tab ${tabId}`);
       await _setBadgeText(tabId, "");
       return;
     }
 
-    // Get sites and usage data from storage
-    const [sitesResult, usageResult] = await Promise.allSettled([
-      getDistractingSites(),
-      getUsageStats(_getCurrentDateString())
-    ]);
+    // Get usage data from storage
+    console.log(`[BadgeManager] Fetching usage data for date: ${_getCurrentDateString()}`);
+    const usageStats = await getUsageStats(_getCurrentDateString()).catch(error => {
+      console.warn('[BadgeManager] Failed to fetch usage stats, using empty data:', error);
+      return {};
+    });
 
-    // Handle errors in data fetching
-    if (sitesResult.status === 'rejected' || !sitesResult.value.success) {
-      console.error('[BadgeManager] Failed to fetch distracting sites:', sitesResult.reason);
-      await _setBadgeText(tabId, "");
-      return;
-    }
-
-    const sites = sitesResult.value.data || [];
-    const usageStats = usageResult.status === 'fulfilled' && usageResult.value.success ? 
-      usageResult.value.data : {};
+    console.log(`[BadgeManager] Retrieved usage stats:`, usageStats);
 
     // Find the specific site
     const site = sites.find(s => s.id === distractionCheck.siteId);
@@ -188,11 +248,21 @@ export async function updateBadge(tabId) {
       return;
     }
 
+    console.log(`[BadgeManager] Found site:`, {
+      id: site.id,
+      urlPattern: site.urlPattern,
+      dailyLimitSeconds: site.dailyLimitSeconds,
+      dailyOpenLimit: site.dailyOpenLimit,
+      isEnabled: site.isEnabled
+    });
+
     // Calculate and set badge text
     const badgeText = _calculateBadgeText(site, usageStats);
+    console.log(`[BadgeManager] Calculated badge text: "${badgeText}"`);
+    
     await _setBadgeText(tabId, badgeText);
     
-    console.log(`[BadgeManager] Updated badge for tab ${tabId}: "${badgeText}"`);
+    console.log(`[BadgeManager] Successfully updated badge for tab ${tabId}: "${badgeText}"`);
 
   } catch (error) {
     console.error('[BadgeManager] Error in updateBadge:', error);

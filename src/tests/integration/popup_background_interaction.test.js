@@ -136,7 +136,7 @@ describe('Popup UI <-> Background Integration', () => {
             let hostname;
             try {
               hostname = new URL(url).hostname;
-            } catch (error) {
+            } catch {
               hostname = url;
             }
             
@@ -191,31 +191,7 @@ describe('Popup UI <-> Background Integration', () => {
             };
           }
           
-          case 'updateSiteLimit': {
-            if (!message.payload) {
-              throw new Error('Payload required for updateSiteLimit');
-            }
-            
-            const { siteId, timeLimit, openLimit } = message.payload;
-            
-            const updates = {};
-            if (timeLimit !== undefined) {
-              updates.dailyLimitSeconds = timeLimit;
-            }
-            if (openLimit !== undefined) {
-              updates.dailyOpenLimit = openLimit;
-            }
-            
-            const updatedSite = await siteStorage.updateDistractingSite(siteId, updates);
-            if (updatedSite === null) {
-              throw new Error('Failed to update site');
-            }
-            
-            return { 
-              success: true, 
-              data: updatedSite 
-            };
-          }
+
           
           default:
             throw new Error(`Unknown action: ${message.action}`);
@@ -431,80 +407,7 @@ describe('Popup UI <-> Background Integration', () => {
     });
   });
 
-  describe('updateSiteLimit', () => {
-    beforeEach(() => {
-      // Setup existing site
-      mockLocalStorageData.distractingSites = [{
-        id: 'site1',
-        urlPattern: 'facebook.com',
-        dailyLimitSeconds: 3600,
-        isEnabled: true
-      }];
-    });
 
-    it('should update time limit only', async () => {
-      const response = await messageHandler({
-        action: 'updateSiteLimit',
-        payload: {
-          siteId: 'site1',
-          timeLimit: 7200
-        }
-      });
-
-      expect(response.success).toBe(true);
-      expect(response.data.dailyLimitSeconds).toBe(7200);
-    });
-
-    it('should update open limit only', async () => {
-      const response = await messageHandler({
-        action: 'updateSiteLimit',
-        payload: {
-          siteId: 'site1',
-          openLimit: 10
-        }
-      });
-
-      expect(response.success).toBe(true);
-      expect(response.data.dailyOpenLimit).toBe(10);
-    });
-
-    it('should update both limits simultaneously', async () => {
-      const response = await messageHandler({
-        action: 'updateSiteLimit',
-        payload: {
-          siteId: 'site1',
-          timeLimit: 5400,
-          openLimit: 8
-        }
-      });
-
-      expect(response.success).toBe(true);
-      expect(response.data.dailyLimitSeconds).toBe(5400);
-      expect(response.data.dailyOpenLimit).toBe(8);
-    });
-
-    it('should handle non-existent site', async () => {
-      const response = await messageHandler({
-        action: 'updateSiteLimit',
-        payload: {
-          siteId: 'non-existent',
-          timeLimit: 7200
-        }
-      });
-
-      expect(response.success).toBe(false);
-      expect(response.error.message).toBe('Failed to update site');
-    });
-
-    it('should handle missing payload', async () => {
-      const response = await messageHandler({
-        action: 'updateSiteLimit'
-      });
-
-      expect(response.success).toBe(false);
-      expect(response.error.message).toBe('Payload required for updateSiteLimit');
-    });
-  });
 
   describe('error handling', () => {
     it('should handle unknown actions', async () => {
@@ -553,12 +456,13 @@ describe('Popup UI <-> Background Integration', () => {
       expect(updatedPageInfoResponse.data.siteInfo).toEqual(newSite);
     });
 
-    it('should support complete edit-limit workflow', async () => {
+    it('should display existing limits as read-only', async () => {
       // Setup existing site
       const existingSite = {
         id: 'site1',
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
+        dailyOpenLimit: 5,
         isEnabled: true
       };
       mockLocalStorageData.distractingSites = [existingSite];
@@ -566,33 +470,19 @@ describe('Popup UI <-> Background Integration', () => {
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: true, siteId: 'site1' });
       
-      // 1. Get page info (existing limit)
+      // Get page info (existing limit)
       const pageInfoResponse = await messageHandler({
         action: 'getCurrentPageLimitInfo'
       });
       
       expect(pageInfoResponse.success).toBe(true);
-      expect(pageInfoResponse.data.siteInfo.id).toBe('site1');
+      expect(pageInfoResponse.data.isDistractingSite).toBe(true);
+      expect(pageInfoResponse.data.siteInfo).toEqual(existingSite);
       
-      // 2. Update the limit
-      const updateResponse = await messageHandler({
-        action: 'updateSiteLimit',
-        payload: {
-          siteId: 'site1',
-          timeLimit: 7200,
-          openLimit: 10
-        }
-      });
-      
-      expect(updateResponse.success).toBe(true);
-      expect(updateResponse.data.dailyLimitSeconds).toBe(7200);
-      expect(updateResponse.data.dailyOpenLimit).toBe(10);
-      
-      // 3. Verify changes persisted
-      const sites = await siteStorage.getDistractingSites();
-      const updatedSite = sites.find(s => s.id === 'site1');
-      expect(updatedSite.dailyLimitSeconds).toBe(7200);
-      expect(updatedSite.dailyOpenLimit).toBe(10);
+      // Verify the site info includes all necessary data for display
+      expect(pageInfoResponse.data.siteInfo.dailyLimitSeconds).toBe(3600);
+      expect(pageInfoResponse.data.siteInfo.dailyOpenLimit).toBe(5);
+      expect(pageInfoResponse.data.siteInfo.urlPattern).toBe('facebook.com');
     });
   });
 }); 
