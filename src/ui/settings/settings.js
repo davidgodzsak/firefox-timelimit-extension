@@ -83,20 +83,31 @@ class SettingsManager {
         // Site form submission
         this.elements.addSiteForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            e.target.dataset.submitted = 'true';
             this.handleAddSite();
         });
         
         // Note form submission
         this.elements.addNoteForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            e.target.dataset.submitted = 'true';
             this.handleAddNote();
         });
         
-        // Input validation
+        // Input validation and touch tracking
         this.elements.siteUrlInput.addEventListener('input', this.validateSiteUrl.bind(this));
         this.elements.timeLimitInput.addEventListener('input', this.validateTimeLimit.bind(this));
         this.elements.openLimitInput.addEventListener('input', this.validateOpenLimit.bind(this)); // NEW: Open limit validation
         this.elements.noteTextInput.addEventListener('input', this.validateNoteText.bind(this));
+        
+        // Track when inputs are touched for validation styling
+        [this.elements.siteUrlInput, this.elements.timeLimitInput, this.elements.openLimitInput, this.elements.noteTextInput].forEach(input => {
+            input.addEventListener('blur', () => input.classList.add('touched'));
+            input.addEventListener('focus', () => {
+                // Remove error class on focus to allow fresh validation
+                input.classList.remove('error');
+            });
+        });
     }
     
     /**
@@ -612,18 +623,38 @@ class SettingsManager {
      * Show field-specific error message
      */
     showFieldError(inputElement, message) {
-        inputElement.classList.add('error');
+        // Clear any existing error messages
+        const existingError = inputElement.parentElement.querySelector('.error-message');
+        if (existingError) {
+            existingError.remove();
+        }
         
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        errorDiv.style.cssText = `
-            color: #dc2626;
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
-        `;
-        
-        inputElement.parentElement.appendChild(errorDiv);
+        if (message) {
+            // Only show error styling if the field has been touched or form submitted
+            if (inputElement.classList.contains('touched') || inputElement.closest('form').dataset.submitted) {
+                inputElement.classList.add('error');
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = message;
+                errorDiv.style.cssText = `
+                    color: var(--accent-error);
+                    font-size: var(--font-size-xs);
+                    margin-top: var(--spacing-1);
+                `;
+                
+                inputElement.parentElement.appendChild(errorDiv);
+            }
+            
+            // Show toast for the error
+            this.showToast(message, 'warning');
+            
+            // Focus the problematic field
+            inputElement.focus();
+        } else {
+            // Remove error styling
+            inputElement.classList.remove('error');
+        }
     }
     
     /**

@@ -133,7 +133,14 @@ export class InlineEditor {
       }
     });
     
-    this.elements.input.addEventListener('input', () => this.validateInput());
+    this.elements.input.addEventListener('input', () => {
+      this.validateInput();
+      this.ensureButtonsVisible(); // Ensure buttons stay visible during typing
+    });
+    
+    this.elements.input.addEventListener('focus', () => this.ensureButtonsVisible());
+    this.elements.input.addEventListener('blur', () => this.ensureButtonsVisible());
+    
     this.elements.saveButton.addEventListener('click', () => this.handleSave());
     this.elements.cancelButton.addEventListener('click', () => this.handleCancel());
     
@@ -166,6 +173,9 @@ export class InlineEditor {
     this.isEditing = true;
     this.container.classList.add('editing');
     
+    // Ensure buttons are always visible and positioned correctly
+    this.ensureButtonsVisible();
+    
     // Focus the input and select all text
     setTimeout(() => {
       this.elements.input.focus();
@@ -180,6 +190,22 @@ export class InlineEditor {
     this.elements.input.value = this.currentValue;
     this.showEditMode();
     this.validateInput();
+  }
+
+  /**
+   * Ensures save/cancel buttons remain visible during editing.
+   * @private
+   */
+  ensureButtonsVisible() {
+    if (this.elements.buttonsContainer) {
+      this.elements.buttonsContainer.style.display = 'flex';
+      this.elements.buttonsContainer.style.visibility = 'visible';
+      this.elements.buttonsContainer.style.opacity = '1';
+      
+      // Ensure buttons are always accessible
+      this.elements.saveButton.style.display = 'flex';
+      this.elements.cancelButton.style.display = 'flex';
+    }
   }
   
   /**

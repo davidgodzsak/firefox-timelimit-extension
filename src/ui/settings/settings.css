@@ -126,6 +126,22 @@
     flex-wrap: wrap;
 }
 
+/* Ensure notes form has proper alignment */
+#add-note-form .form-row {
+    align-items: stretch;
+}
+
+#add-note-form .form-group.flex-grow {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+#add-note-form .btn {
+    height: fit-content;
+    align-self: flex-end;
+}
+
 .form-group {
     display: flex;
     flex-direction: column;
@@ -161,6 +177,18 @@
     outline: none;
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Remove red border validation style from untouched inputs */
+.form-input:invalid {
+    border-color: var(--border-primary);
+}
+
+/* Only show validation error styling when the field has been touched or submitted */
+.form-input.error,
+.form-input:invalid.touched {
+    border-color: var(--accent-error);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
 .form-input::placeholder {
@@ -684,12 +712,14 @@
 /* Edit Mode */
 .inline-editor-edit {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--spacing-2);
     flex: 1;
+    min-height: 36px; /* Ensure consistent height */
 }
 
 .inline-editor-input {
+    flex: 1;
     padding: var(--spacing-2) var(--spacing-3);
     border: 2px solid var(--border-primary);
     border-radius: var(--radius-md);
@@ -699,6 +729,7 @@
     background: var(--bg-secondary);
     transition: all var(--transition-fast);
     line-height: var(--line-height-normal);
+    min-width: 0; /* Prevent overflow */
 }
 
 .inline-editor-input:focus {
@@ -713,9 +744,12 @@
 }
 
 .inline-editor-buttons {
-    display: flex;
+    display: flex !important;
     gap: var(--spacing-2);
     align-items: center;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .inline-editor-save-btn,
@@ -794,15 +828,20 @@
 .site-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
 }
 
 .site-url {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-medium);
     color: var(--text-primary);
-    margin: 0 0 var(--spacing-1) 0;
+    margin: 0;
     line-height: var(--line-height-tight);
     word-break: break-word;
+    flex: 1;
+    min-width: 0;
 }
 
 .site-status {
@@ -812,69 +851,28 @@
     border-radius: var(--radius-full);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid;
 }
 
 .site-status.enabled {
-    background: rgba(34, 197, 94, 0.1);
-    color: var(--success-color);
+    background: var(--color-success);
+    color: var(--color-white);
+    border-color: var(--color-success);
 }
 
 .site-status.disabled {
-    background: rgba(107, 114, 128, 0.1);
-    color: var(--text-muted);
+    background: var(--color-gray-500);
+    color: var(--color-white);
+    border-color: var(--color-gray-500);
 }
 
 .form-actions {
     display: flex;
     gap: var(--spacing-2);
     align-items: center;
-}
-
-.toggle-btn,
-.delete-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.toggle-btn.enabled {
-    background: var(--success-color);
-    color: white;
-    border-color: var(--success-color);
-}
-
-.toggle-btn.disabled {
-    background: var(--bg-secondary);
-    color: var(--text-muted);
-}
-
-.toggle-btn.enabled:hover {
-    background: var(--success-color-hover, #16a34a);
-    border-color: var(--success-color-hover, #16a34a);
-}
-
-.toggle-btn.disabled:hover {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-}
-
-.delete-btn {
-    background: var(--bg-secondary);
-    color: var(--text-muted);
-}
-
-.delete-btn:hover {
-    background: var(--error-color);
-    color: white;
-    border-color: var(--error-color);
 }
 
 .limit-form-body {
