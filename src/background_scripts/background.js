@@ -78,12 +78,19 @@ async function handleAlarm(alarm) {
         const totalTimeSeconds = await updateUsage();
         console.log(`[Background] Usage updated via alarm. Total time: ${totalTimeSeconds}s`);
         
-        // Update badge for current tracking info
+        // Update badge for current tracking info and broadcast usage update
         try {
           const trackingInfo = await getCurrentTrackingInfo();
-          if (trackingInfo.isTracking && trackingInfo.tabId) {
+          if (trackingInfo.isTracking && trackingInfo.tabId && trackingInfo.siteId) {
             console.log(`[Background] Updating badge for tracked tab ${trackingInfo.tabId} after usage update`);
             await updateBadge(trackingInfo.tabId);
+            
+            // Broadcast usage update to UI components
+            await broadcastToUIComponents('usageUpdated', { 
+              siteId: trackingInfo.siteId,
+              totalTimeSeconds: totalTimeSeconds,
+              tabId: trackingInfo.tabId
+            });
           } else {
             console.log(`[Background] No active tracking found during alarm, skipping badge update`);
           }
@@ -437,6 +444,9 @@ async function handleMessage(message, _sender, _sendResponse) {
         // Refresh badge for current tab since limits may have changed
         await _refreshCurrentTabBadge();
         
+        // Broadcast the update to all UI components
+        await broadcastToUIComponents('siteAdded', { site: newSite });
+        
         return { 
           success: true, 
           data: newSite,
@@ -474,6 +484,9 @@ async function handleMessage(message, _sender, _sendResponse) {
         
         // Refresh badge for current tab since limits may have changed
         await _refreshCurrentTabBadge();
+        
+        // Broadcast the update to all UI components
+        await broadcastToUIComponents('siteUpdated', { site: updatedSite, updates: message.payload.updates });
         
         // CRITICAL: Re-evaluate current tab blocking status immediately
         // This fixes the issue where updated limits don't take effect until next navigation
@@ -535,6 +548,9 @@ async function handleMessage(message, _sender, _sendResponse) {
         
         // Refresh badge for current tab since the site may have been removed
         await _refreshCurrentTabBadge();
+        
+        // Broadcast the update to all UI components
+        await broadcastToUIComponents('siteDeleted', { siteId: message.payload.id });
         
         return { 
           success: true, 
@@ -732,8 +748,12 @@ async function handleMessage(message, _sender, _sendResponse) {
             };
           }
           
-          // Get site information
-          const sites = await getDistractingSites();
+          // Get site information and current usage data
+          const [sites, { getUsageStats }] = await Promise.all([
+            getDistractingSites(),
+            import('./usage_storage.js')
+          ]);
+          
           const site = sites.find(s => s.id === siteId);
           
           if (!site) {
@@ -749,13 +769,26 @@ async function handleMessage(message, _sender, _sendResponse) {
             };
           }
           
+          // Get today's usage stats for accurate progress bars
+          const today = new Date().toISOString().split('T')[0];
+          const todayUsage = await getUsageStats(today);
+          const siteUsage = todayUsage[siteId] || { timeSpentSeconds: 0, opens: 0 };
+          
+          // Enhanced site info with real usage data
+          const enhancedSiteInfo = {
+            ...site,
+            todaySeconds: siteUsage.timeSpentSeconds,
+            todayOpenCount: siteUsage.opens,
+            lastUpdated: Date.now()
+          };
+          
           return {
             success: true,
             data: {
               url: activeTab.url,
               hostname: new URL(activeTab.url).hostname,
               isDistractingSite: true,
-              siteInfo: site
+              siteInfo: enhancedSiteInfo
             },
             error: null
           };
@@ -766,6 +799,105 @@ async function handleMessage(message, _sender, _sendResponse) {
             success: false,
             error: {
               message: 'Failed to get current page information',
+              type: ERROR_TYPES.SYSTEM,
+              isRetryable: true
+            }
+          };
+        }
+      }
+      
+      // === Real-time Updates API ===
+      case 'refreshCurrentPageData': {
+        try {
+          // Get current active tab
+          const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+          if (tabs.length === 0) {
+            return {
+              success: false,
+              error: {
+                message: 'No active tab found',
+                type: ERROR_TYPES.SYSTEM,
+                isRetryable: true
+              }
+            };
+          }
+          
+          const activeTab = tabs[0];
+          if (!activeTab.url) {
+            return {
+              success: false,
+              error: {
+                message: 'Cannot access current tab URL',
+                type: ERROR_TYPES.SYSTEM,
+                isRetryable: true
+              }
+            };
+          }
+          
+          // Check if URL is a distracting site
+          const distractionCheck = checkIfUrlIsDistracting(activeTab.url);
+          const { isMatch, siteId } = distractionCheck;
+          
+          if (!isMatch || !siteId) {
+            return {
+              success: true,
+              data: {
+                isDistractingSite: false,
+                usage: null,
+                badgeText: ''
+              },
+              error: null
+            };
+          }
+          
+          // Get current usage data and site info
+          const [sites, { getUsageStats }] = await Promise.all([
+            getDistractingSites(),
+            import('./usage_storage.js')
+          ]);
+          
+          const site = sites.find(s => s.id === siteId);
+          if (!site || !site.isEnabled) {
+            return {
+              success: true,
+              data: {
+                isDistractingSite: false,
+                usage: null,
+                badgeText: ''
+              },
+              error: null
+            };
+          }
+          
+          // Get today's usage stats
+          const today = new Date().toISOString().split('T')[0];
+          const todayUsage = await getUsageStats(today);
+          const siteUsage = todayUsage[siteId] || { timeSpentSeconds: 0, opens: 0 };
+          
+          // Update badge for current tab
+          await updateBadge(activeTab.id);
+          
+          return {
+            success: true,
+            data: {
+              isDistractingSite: true,
+              usage: {
+                timeSpentSeconds: siteUsage.timeSpentSeconds,
+                opens: siteUsage.opens,
+                lastUpdated: Date.now()
+              },
+              site: site,
+              badgeText: 'Updated by badge manager'
+            },
+            error: null
+          };
+          
+        } catch (error) {
+          console.error('[Background] Error refreshing current page data:', error);
+          return {
+            success: false,
+            error: {
+              message: 'Failed to refresh page data',
               type: ERROR_TYPES.SYSTEM,
               isRetryable: true
             }
@@ -804,6 +936,9 @@ async function handleMessage(message, _sender, _sendResponse) {
         
         // Refresh badge for current tab
         await _refreshCurrentTabBadge();
+        
+        // Broadcast the update to all UI components
+        await broadcastToUIComponents('quickLimitAdded', { site: newSite });
         
         return { 
           success: true, 
@@ -1002,6 +1137,54 @@ async function _refreshCurrentTabBadge() {
   } catch (error) {
     console.warn('[Background] Error refreshing current tab badge:', error);
     // Non-critical, continue without throwing
+  }
+}
+
+/**
+ * Broadcasts updates to all extension UI components for real-time synchronization
+ * @param {string} type - The type of update ('siteUpdated', 'siteDeleted', 'usageUpdated', etc.)
+ * @param {Object} data - The data associated with the update
+ */
+async function broadcastToUIComponents(type, data) {
+  try {
+    // Create the broadcast message
+    const message = {
+      type: 'broadcastUpdate',
+      updateType: type,
+      data: data,
+      timestamp: Date.now()
+    };
+    
+    console.log(`[Background] Broadcasting update: ${type}`, data);
+    
+    // Try to send to popup (if open)
+    try {
+      await browser.runtime.sendMessage(message);
+    } catch (error) {
+      // Popup probably not open, which is fine
+      console.log('[Background] Popup not available for broadcast (expected if closed)');
+    }
+    
+    // Get all extension pages (settings, timeout) and send message
+    try {
+      const views = browser.extension.getViews();
+      views.forEach(view => {
+        if (view.location.href.includes('/settings/') || 
+            view.location.href.includes('/timeout/')) {
+          try {
+            view.postMessage(message, '*');
+          } catch (error) {
+            console.warn('[Background] Error posting message to view:', error);
+          }
+        }
+      });
+    } catch (error) {
+      console.warn('[Background] Error getting extension views:', error);
+    }
+    
+  } catch (error) {
+    console.warn('[Background] Error broadcasting update:', error);
+    // Don't fail the main operation if broadcast fails
   }
 }
 

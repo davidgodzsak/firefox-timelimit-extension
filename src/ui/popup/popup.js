@@ -28,8 +28,13 @@ let _validationTimers = {
 const PERFORMANCE_CONFIG = {
   DEBOUNCE_DELAY: 300, // ms for form validation debouncing
   DOM_BATCH_SIZE: 5, // Batch DOM operations for better performance
-  ERROR_DISPLAY_TIMEOUT: 5000 // Auto-hide errors after 5 seconds
+  ERROR_DISPLAY_TIMEOUT: 5000, // Auto-hide errors after 5 seconds
+  REFRESH_INTERVAL: 10000 // Auto-refresh every 10 seconds when popup is visible
 };
+
+// Real-time update management
+let _refreshTimer = null;
+let _isVisible = false;
 
 /**
  * Initializes DOM element references with error handling.
@@ -635,6 +640,11 @@ async function handleFormSubmit(event) {
     _dataCache.currentPageData = null;
     _dataCache.cacheExpiry = 0;
     
+    // Refresh current data to show updated limits immediately
+    setTimeout(async () => {
+      await refreshCurrentData();
+    }, 200);
+    
     showSection('success');
     
   } catch (error) {
@@ -740,8 +750,46 @@ async function initializePopup() {
     // Set up keyboard shortcuts
     document.addEventListener('keydown', handleKeyboardShortcuts);
     
+    // Track popup visibility for real-time updates
+    _isVisible = true;
+    
+    // Handle visibility changes
+    document.addEventListener('visibilitychange', () => {
+      _isVisible = !document.hidden;
+      if (_isVisible) {
+        // Refresh data when popup becomes visible
+        setTimeout(refreshCurrentData, 100);
+      }
+    });
+    
+    // Handle window focus/blur for better real-time updates
+    window.addEventListener('focus', () => {
+      _isVisible = true;
+      setTimeout(refreshCurrentData, 100);
+    });
+    
+    window.addEventListener('blur', () => {
+      _isVisible = false;
+    });
+    
+    // Clean up when popup is closed
+    window.addEventListener('beforeunload', () => {
+      stopAutoRefresh();
+    });
+    
+    // Listen for broadcast messages from background script
+    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'broadcastUpdate') {
+        handleBroadcastUpdate(message);
+      }
+      // Don't return anything for broadcast messages to avoid interfering with other listeners
+    });
+    
     // Load current page information
     await loadCurrentPageInfo();
+    
+    // Start auto-refresh for real-time updates
+    startAutoRefresh();
     
     console.log('[Popup] Popup initialized successfully');
     
@@ -756,4 +804,133 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializePopup);
 } else {
   initializePopup();
+}
+
+/**
+ * Refreshes current page data without full reload for real-time updates.
+ * @async
+ * @private
+ */
+async function refreshCurrentData() {
+  if (!currentPageInfo || !currentPageInfo.isDistractingSite) {
+    return; // No point refreshing if not a distracting site
+  }
+  
+  try {
+    const refreshData = await sendMessage({
+      action: 'refreshCurrentPageData'
+    });
+    
+    if (refreshData.isDistractingSite && refreshData.site && refreshData.usage) {
+      // Update current page info with fresh usage data
+      currentPageInfo.siteInfo = {
+        ...currentPageInfo.siteInfo,
+        todaySeconds: refreshData.usage.timeSpentSeconds,
+        todayOpenCount: refreshData.usage.opens,
+        lastUpdated: refreshData.usage.lastUpdated
+      };
+      
+      // Update the display with fresh data
+      displayExistingLimits(currentPageInfo.siteInfo);
+      
+      console.log('[Popup] Refreshed usage data:', refreshData.usage);
+    }
+  } catch (error) {
+    console.warn('[Popup] Error refreshing data:', error);
+    // Don't show error to user for background refreshes
+  }
+}
+
+/**
+ * Starts automatic refresh timer for real-time updates.
+ * @private
+ */
+function startAutoRefresh() {
+  if (_refreshTimer) {
+    clearInterval(_refreshTimer);
+  }
+  
+  _refreshTimer = setInterval(async () => {
+    if (_isVisible && currentPageInfo && currentPageInfo.isDistractingSite) {
+      await refreshCurrentData();
+    }
+  }, PERFORMANCE_CONFIG.REFRESH_INTERVAL);
+  
+  console.log('[Popup] Auto-refresh started');
+}
+
+/**
+ * Stops automatic refresh timer.
+ * @private
+ */
+function stopAutoRefresh() {
+  if (_refreshTimer) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
+  console.log('[Popup] Auto-refresh stopped');
+}
+
+/**
+ * Handles broadcast messages from background script for real-time updates.
+ * @private
+ * @param {Object} message - The broadcast message
+ */
+function handleBroadcastUpdate(message) {
+  if (!message || message.type !== 'broadcastUpdate') {
+    return;
+  }
+  
+  console.log('[Popup] Received broadcast update:', message.updateType, message.data);
+  
+  // Only handle updates if we're visible and have page info
+  if (!_isVisible || !currentPageInfo) {
+    return;
+  }
+  
+  switch (message.updateType) {
+    case 'siteUpdated':
+      // If the updated site matches our current page, refresh our data
+      if (currentPageInfo.isDistractingSite && 
+          currentPageInfo.siteInfo && 
+          message.data.site && 
+          currentPageInfo.siteInfo.id === message.data.site.id) {
+        console.log('[Popup] Current site was updated, refreshing display');
+        setTimeout(refreshCurrentData, 100);
+      }
+      break;
+      
+    case 'siteDeleted':
+      // If the deleted site matches our current page, refresh to show it's no longer limited
+      if (currentPageInfo.isDistractingSite && 
+          currentPageInfo.siteInfo && 
+          message.data.siteId === currentPageInfo.siteInfo.id) {
+        console.log('[Popup] Current site was deleted, reloading page info');
+        setTimeout(loadCurrentPageInfo, 100);
+      }
+      break;
+      
+    case 'usageUpdated':
+      // If usage was updated for our current site, refresh the progress bars
+      if (currentPageInfo.isDistractingSite && 
+          currentPageInfo.siteInfo && 
+          message.data.siteId === currentPageInfo.siteInfo.id) {
+        console.log('[Popup] Usage updated for current site, refreshing progress');
+        setTimeout(refreshCurrentData, 50); // Faster refresh for usage updates
+      }
+      break;
+      
+    case 'siteAdded':
+    case 'quickLimitAdded':
+      // If a new site was added and matches our current page, reload to show limits
+      if (!currentPageInfo.isDistractingSite && message.data.site) {
+        const currentHostname = extractHostname(currentPageInfo.url || '');
+        if (currentHostname && message.data.site.urlPattern && 
+            currentHostname.includes(message.data.site.urlPattern)) {
+          console.log('[Popup] New limit added for current page, reloading');
+          setTimeout(loadCurrentPageInfo, 100);
+        }
+      }
+      break;
+  }
 } 

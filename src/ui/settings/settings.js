@@ -56,6 +56,39 @@ class SettingsManager {
     }
     
     /**
+     * Handles broadcast messages for real-time updates across components
+     * @private
+     * @param {Object} message - The broadcast message
+     */
+    handleBroadcastUpdate(message) {
+        if (!message || message.type !== 'broadcastUpdate') {
+            return;
+        }
+        
+        console.log('[Settings] Received broadcast update:', message.updateType, message.data);
+        
+        switch (message.updateType) {
+            case 'quickLimitAdded':
+                // A limit was added from popup, refresh our sites list
+                if (message.data.site) {
+                    console.log('[Settings] Quick limit added from popup, refreshing sites');
+                    this.distractingSites.push(message.data.site);
+                    this.renderSites();
+                    this.showToast(`Limit added for "${message.data.site.urlPattern}" from popup.`, 'info');
+                }
+                break;
+                
+            case 'usageUpdated':
+                // Usage was updated, no need to refresh settings page
+                console.log('[Settings] Usage updated for site:', message.data.siteId);
+                break;
+                
+            // Note: siteUpdated, siteAdded, siteDeleted are initiated from this page,
+            // so we don't need to handle them here to avoid duplicate updates
+        }
+    }
+    
+    /**
      * Initialize the settings manager
      */
     async init() {
@@ -68,11 +101,36 @@ class SettingsManager {
             // Small delay to ensure UI has rendered before hiding loader
             await new Promise(resolve => setTimeout(resolve, 100));
             
+            this.setupBroadcastListeners();
+            
         } catch (error) {
             console.error('Failed to initialize settings:', error);
             this.showToast('Failed to load settings. Please refresh the page.', 'error');
         } finally {
             this.showLoading(false);
+        }
+    }
+    
+    /**
+     * Setup event listeners for real-time updates
+     * @private
+     */
+    setupBroadcastListeners() {
+        // Listen for postMessage events from background script
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'broadcastUpdate') {
+                this.handleBroadcastUpdate(event.data);
+            }
+        });
+        
+        // Also listen for runtime messages as backup
+        if (browser.runtime && browser.runtime.onMessage) {
+            browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+                if (message.type === 'broadcastUpdate') {
+                    this.handleBroadcastUpdate(message);
+                }
+                // Don't return anything to avoid interfering with other listeners
+            });
         }
     }
     
