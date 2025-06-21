@@ -5,6 +5,88 @@ All notable changes to the Firefox Distraction Limiter extension will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-01-09
+
+### 🏗️ Major Architecture Overhaul
+
+This release represents a **fundamental architectural transformation** from Manifest V2-style to a modern, event-driven Manifest V3 architecture, significantly improving performance, reliability, and browser compatibility.
+
+#### 🚀 Event-Driven Architecture Migration
+- **Complete Background Script Refactor**: Migrated from persistent `main.js` orchestrator to event-driven `background.js` router
+- **Non-Persistent Background**: Background script now dormant until woken by browser events, improving memory efficiency
+- **Event Router Pattern**: New `background.js` serves as central event dispatcher for all browser API listeners
+- **Stateless Modules**: All background modules redesigned to be stateless, using `chrome.storage` as single source of truth
+- **Alarm-Based Timers**: Replaced `setInterval`/`setTimeout` with `chrome.alarms` API for all time-based operations
+
+#### 📁 Project Structure Reorganization
+- **Consolidated Source**: Moved entire codebase from `distracting-sites-limiter-firefox/` to `src/` for better organization
+- **Cleaner Development**: Simplified build process and development workflow
+- **Better Module Organization**: Enhanced separation of concerns across all components
+
+#### 🔧 Core Module Refactoring
+
+**New Event-Driven Background System:**
+- `background.js` - Central event router replacing `main.js`
+- Enhanced `usage_recorder.js` - Now alarm-based instead of timer-based tracking
+- Simplified `badge_manager.js` - Stateless badge updates with storage-based calculations
+- Updated `daily_reset.js` - Alarm-driven daily resets
+- Improved `site_blocker.js` - Proactive blocking via `webNavigation.onBeforeNavigate`
+
+**Enhanced Browser Integration:**
+- `runtime.onInstalled` - Extension initialization and alarm setup
+- `alarms.onAlarm` - Handles daily resets and usage updates
+- `webNavigation.onBeforeNavigate` - Proactive site blocking
+- `tabs.onActivated/onUpdated` - Real-time tab tracking
+- `windows.onFocusChanged` - Window focus awareness
+
+#### 🧪 Comprehensive Testing Suite Overhaul
+- **New Integration Tests**: Added comprehensive tests for event-driven architecture
+  - `core_functionality_fix_verification.test.js` - End-to-end functionality verification
+  - `site_blocking_integration.test.js` - Enhanced blocking logic testing
+  - `usage_tracking_integration.test.js` - Alarm-based usage tracking tests
+- **Updated Unit Tests**: All existing tests refactored for new architecture
+- **Performance Testing**: New tests for badge calculation optimization and memory management
+- **Error Handling**: Enhanced error scenario testing throughout the system
+
+#### 🎨 Enhanced User Interface
+- **Real-Time Synchronization**: All UI components now receive live updates via broadcast messaging
+- **Improved Error Handling**: Better error categorization and user feedback across all interfaces
+- **Enhanced Popup**: More robust popup-background communication with fallback mechanisms
+- **Settings Page**: Better inline editing with improved validation and error states
+- **Timeout Page**: Enhanced shuffle functionality with performance optimizations
+
+#### ⚡ Performance & Reliability Improvements
+- **Memory Optimization**: Significant reduction in background script memory usage
+- **Badge Text Caching**: Optimized badge calculations with intelligent caching
+- **Debounced Updates**: Reduced excessive DOM manipulations and API calls
+- **Error Recovery**: Better error handling and recovery mechanisms throughout
+- **Storage Efficiency**: Optimized storage operations and reduced write frequency
+
+
+### Technical Details
+
+#### Browser API Migration
+- **Manifest V3 Compliance**: Full migration to modern browser extension standards
+- **Event-Driven Listeners**: All functionality now triggered by browser events
+- **Storage as State**: Complete reliance on `chrome.storage` for state management
+- **Improved Permissions**: Optimized permission usage for better security
+
+#### Backward Compatibility
+- **Settings Migration**: Existing user configurations seamlessly migrated
+- **Data Preservation**: All usage statistics and site configurations retained
+- **Feature Parity**: All v1.1.0 features maintained with improved implementation
+
+#### Developer Experience
+- **Modern Architecture**: Clean, maintainable event-driven codebase
+- **Better Testing**: Comprehensive test coverage for all new patterns
+- **Documentation**: Enhanced code documentation and architectural guidelines
+- **Build Process**: Streamlined development and packaging workflow
+
+### Browser Compatibility
+- **Enhanced Firefox Support**: Improved compatibility with Firefox 112+
+- **Future-Proof**: Architecture designed for long-term browser evolution
+- **Performance**: Better integration with browser process management
+
 ## [1.1.0] - 2025-06-16
 
 ### Added
@@ -103,5 +185,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Firefox Developer Edition
 - Firefox ESR (latest)
 
+[1.2.0]: https://github.com/davidgodzsak/firefox-timelimit-extension/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/davidgodzsak/firefox-timelimit-extension/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/davidgodzsak/firefox-timelimit-extension/releases/tag/v1.0.0 

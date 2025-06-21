@@ -3,7 +3,7 @@
 > A Firefox extension that helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/davidgodzsak/firefox-timelimit-extension)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/davidgodzsak/firefox-timelimit-extension)
 
 ## Features
 
@@ -28,6 +28,12 @@
 - 📊 **Usage Statistics**: View detailed usage analytics
 - 🔄 **Daily Reset**: Automatic reset of daily usage counters
 
+### Architecture (NEW in v1.2.0)
+- 🏗️ **Event-Driven**: Modern Manifest V3 event-driven architecture for better performance
+- ⚡ **Non-Persistent**: Background script runs only when needed, improving memory efficiency
+- 🔄 **Real-Time Sync**: All UI components synchronized with live updates
+- 🛡️ **Enhanced Security**: Improved permission model and error handling
+
 ## Installation
 
 ### From Source
@@ -35,11 +41,12 @@
 1. Clone the repository:
    ```bash
    git clone https://github.com/davidgodzsak/firefox-timelimit-extension.git
-   cd firefox-timelimit-extension/distracting-sites-limiter-firefox
+   cd firefox-timelimit-extension
    ```
 
 2. Install dependencies:
    ```bash
+   cd src
    yarn install
    ```
 
@@ -52,12 +59,13 @@
    - Open Firefox and navigate to `about:debugging`
    - Click "This Firefox"
    - Click "Load Temporary Add-on"
-   - Select the `manifest.json` file from the project directory
+   - Select the `manifest.json` file from the `src` directory
 
 ### Production Package
 
 1. Create a distribution package:
    ```bash
+   cd src
    yarn package
    ```
 
@@ -96,6 +104,7 @@
 
 1. Install dependencies:
    ```bash
+   cd src
    yarn install
    ```
 
@@ -117,45 +126,45 @@
 ### Project Structure
 
 ```
-distracting-sites-limiter-firefox/
-├── background_scripts/          # Core extension logic
-│   ├── main.js                 # Main background script entry point
+src/                            # Main source directory (NEW in v1.2.0)
+├── background_scripts/          # Event-driven background logic (ENHANCED in v1.2.0)
+│   ├── background.js           # Event router replacing main.js (NEW in v1.2.0)
 │   ├── site_storage.js         # Site configuration management
-│   ├── usage_recorder.js       # Time tracking functionality
+│   ├── usage_recorder.js       # Alarm-based time tracking (ENHANCED in v1.2.0)
 │   ├── usage_storage.js        # Usage data persistence
 │   ├── distraction_detector.js # Site detection logic
-│   ├── site_blocker.js         # Site blocking functionality
-│   ├── tab_activity_monitor.js # Tab activity tracking
-│   ├── daily_reset.js          # Daily usage reset
+│   ├── site_blocker.js         # Event-driven site blocking (ENHANCED in v1.2.0)
+│   ├── daily_reset.js          # Alarm-based daily usage reset (ENHANCED in v1.2.0)
 │   ├── note_storage.js         # Motivational notes storage
-│   ├── badge_manager.js        # Toolbar badge text management (NEW)
+│   ├── badge_manager.js        # Stateless toolbar badge management (ENHANCED in v1.2.0)
 │   └── validation_utils.js     # Input validation utilities
 ├── ui/                         # User interface components
-│   ├── popup/                  # Toolbar popup interface (NEW)
+│   ├── popup/                  # Toolbar popup interface (NEW in v1.1.0)
 │   │   ├── popup.html          # Popup structure
 │   │   ├── popup.css           # Popup styling
-│   │   └── popup.js            # Popup functionality
+│   │   └── popup.js            # Enhanced popup with real-time sync (ENHANCED in v1.2.0)
 │   ├── settings/               # Settings page
-│   │   ├── components/         # Reusable UI components (ENHANCED)
-│   │   │   ├── inline-editor.js # Inline editing component (NEW)
-│   │   │   └── limit-form.js   # Enhanced form component (NEW)
+│   │   ├── components/         # Reusable UI components (ENHANCED in v1.1.0)
+│   │   │   ├── inline-editor.js # Inline editing component (NEW in v1.1.0)
+│   │   │   └── limit-form.js   # Enhanced form component (NEW in v1.1.0)
 │   │   ├── settings.html       # Settings page structure
 │   │   ├── settings.css        # Settings styling  
-│   │   └── settings.js         # Settings functionality
-│   ├── timeout/                # Timeout/blocking page (ENHANCED)
+│   │   └── settings.js         # Settings with broadcast updates (ENHANCED in v1.2.0)
+│   ├── timeout/                # Timeout/blocking page
 │   │   ├── timeout.html        # Timeout page structure
 │   │   ├── timeout.css         # Timeout styling
-│   │   └── timeout.js          # Timeout functionality + shuffle (NEW)
+│   │   └── timeout.js          # Enhanced timeout with shuffle (ENHANCED in v1.1.0, v1.2.0)
 │   └── common_assets/          # Shared UI assets
+│       ├── css/                # Global styles
+│       └── images/             # Icon definitions (NEW in v1.2.0)
 ├── assets/                     # Extension assets
 │   └── icons/                  # Icon files
 ├── _locales/                   # Internationalization
 │   └── en/                     # English locale
-├── tests/                      # Test suite (ENHANCED)
-│   ├── unit/                   # Unit tests
-│   └── integration/            # Integration tests + new popup tests
-├── dist/                       # Build output
-├── manifest.json               # Extension manifest (UPDATED for toolbar)
+├── tests/                      # Comprehensive test suite (ENHANCED in v1.2.0)
+│   ├── unit/                   # Unit tests for all modules
+│   └── integration/            # Integration tests for event-driven architecture
+├── manifest.json               # Extension manifest (UPDATED for v1.2.0 architecture)
 ├── package.json                # Node.js package configuration
 └── build.js                    # Build script
 ```
@@ -187,13 +196,14 @@ yarn test tests/unit/background_scripts/site_storage.test.js
 
 ### Test Coverage
 
-- **Background Scripts**: Complete unit test coverage for all core modules including new badge manager
+- **Background Scripts**: Complete unit test coverage for all core modules including event-driven architecture (ENHANCED in v1.2.0)
+- **Event-Driven Integration**: Full testing of alarm-based timing and browser event handling (NEW in v1.2.0)
 - **Popup Integration**: Full testing of popup-background communication
 - **Combined Limits**: Comprehensive testing of time + open count limit scenarios
 - **Validation**: Enhanced validation testing for all user inputs including new limit types
 - **Storage**: Full CRUD operation testing for site and usage data
-- **Error Handling**: Extensive error scenario testing including popup communication failures
-- **Performance**: Testing for badge calculation optimization and memory management
+- **Error Handling**: Extensive error scenario testing including popup communication failures and event-driven edge cases (ENHANCED in v1.2.0)
+- **Performance**: Testing for badge calculation optimization, memory management, and alarm-based operations (ENHANCED in v1.2.0)
 
 ## Configuration
 
@@ -287,7 +297,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 See [CHANGELOG.md](docs/CHANGELOG.md) for detailed version history.
 
-### v1.1.0 (Current) - Major Feature Update
+### v1.2.0 (Current) - Major Architecture Overhaul
+
+#### 🏗️ **Complete Event-Driven Refactor**
+- **Background Script Migration**: Migrated from `main.js` to event-driven `background.js` architecture
+- **Manifest V3 Compliance**: Full adoption of modern browser extension standards
+- **Non-Persistent Background**: Background script now dormant until needed, improving memory efficiency
+- **Alarm-Based Operations**: All timing operations now use `chrome.alarms` API instead of timers
+
+#### 📁 **Project Reorganization**
+- **Source Consolidation**: Moved codebase from `distracting-sites-limiter-firefox/` to `src/`
+- **Enhanced Architecture**: Event router pattern with stateless modules
+- **Real-Time Sync**: All UI components receive live updates via broadcast messaging
+
+#### 🧪 **Testing & Quality**
+- **New Integration Tests**: Comprehensive event-driven architecture testing
+- **Enhanced Error Handling**: Better error categorization and recovery
+- **Performance Optimization**: Badge caching, debounced updates, memory management
+- **Bug Fixes**: Addressed UI issues including invisible save buttons and form interactions
+
+### v1.1.0 - Major Feature Update
 
 #### 🆕 New Features
 - **Toolbar Integration**: Quick limit management via popup
@@ -314,9 +343,13 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for detailed version history.
 
 ## Known Issues
 
-1. **Badge Text Performance**: Badge calculations may slow down with many configured sites (optimizations planned)
-2. **Popup Responsiveness**: Popup may not render correctly on very small screen resolutions
-3. **Concurrent Editing**: Multiple settings tabs editing the same site simultaneously may cause conflicts
+1. ~~**Badge Text Performance**: Badge calculations may slow down with many configured sites~~ (FIXED in v1.2.0 with caching optimizations)
+2. ~~**Popup Responsiveness**: Popup may not render correctly on very small screen resolutions~~ (IMPROVED in v1.2.0)
+3. ~~**Settings Save Buttons**: Save buttons in settings may be invisible until hover~~ (FIXED in v1.2.0)
+4. **Concurrent Editing**: Multiple settings tabs editing the same site simultaneously may cause conflicts
+5. ~~**Extension Context**: Some edge cases with extension context invalidation~~ (IMPROVED in v1.2.0 with better error handling)
+
+Note: Many issues from previous versions have been resolved in v1.2.0 through the architectural improvements and enhanced error handling.
 
 ## Support
 
