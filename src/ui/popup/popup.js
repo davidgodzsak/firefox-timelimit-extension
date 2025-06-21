@@ -68,7 +68,7 @@ function initializeElements() {
       limitsFormSection: document.getElementById('limitsFormSection'),
       limitsForm: document.getElementById('limitsForm'),
       formTitle: document.getElementById('formTitle'),
-      urlPattern: document.getElementById('urlPattern'),
+      // QA FIX: Removed urlPattern - auto-detect from current tab
       timeLimit: document.getElementById('timeLimit'),
       openLimit: document.getElementById('openLimit'),
       errorMessage: document.getElementById('errorMessage'),
@@ -148,11 +148,7 @@ function setupEventListeners() {
         debouncedValidation('openLimit', e.target.value);
       });
     }
-    if (elements.urlPattern) {
-      elements.urlPattern.addEventListener('input', (e) => {
-        debouncedValidation('urlPattern', e.target.value);
-      });
-    }
+    // QA FIX: Removed urlPattern input validation - auto-detect from current tab
     
     // Keyboard shortcuts for better UX
     document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -327,16 +323,16 @@ async function loadCurrentPageInfo() {
       }
       
       if (data.isDistractingSite && data.siteInfo) {
-        // Site already has limits - show existing limits only
+        // QA FIX: Show cleaner status message since progress bars provide sufficient info
         if (elements.pageStatus) {
-          elements.pageStatus.textContent = 'Site has configured limits';
+          elements.pageStatus.textContent = `${data.hostname || extractHostname(data.url)} - Active limits`;
         }
         displayExistingLimits(data.siteInfo);
         showSection('existing');
       } else {
-        // Site doesn't have limits - show add form directly
+        // QA FIX: Show cleaner status for unconfigured sites
         if (elements.pageStatus) {
-          elements.pageStatus.textContent = 'No limits configured';
+          elements.pageStatus.textContent = `${data.hostname || extractHostname(data.url)} - No limits configured`;
         }
         setupNewSiteForm(data.hostname || extractHostname(data.url));
         showSection('form');
@@ -473,7 +469,7 @@ function displayExistingLimits(siteInfo) {
  * @param {string} hostname - The hostname to pre-fill
  */
 function setupNewSiteForm(hostname) {
-  // Update form title with icon (already in HTML)
+  // QA FIX: Update form title to show the specific site name being configured
   if (elements.formTitle) {
     elements.formTitle.innerHTML = `
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -481,7 +477,7 @@ function setupNewSiteForm(hostname) {
         <line x1="12" y1="8" x2="12" y2="16"/>
         <line x1="8" y1="12" x2="16" y2="12"/>
       </svg>
-      Add Limits for This Site
+      Add Limits for ${hostname || 'This Site'}
     `;
   }
   
@@ -495,8 +491,13 @@ function setupNewSiteForm(hostname) {
     `;
   }
   
-  // Pre-fill form
-  if (elements.urlPattern) elements.urlPattern.value = hostname;
+  // QA FIX: Store hostname for form submission (no longer pre-filling input)
+  // Store the hostname in a data attribute or variable for later use
+  if (elements.limitsForm) {
+    elements.limitsForm.dataset.hostname = hostname || '';
+  }
+  
+  // Clear form fields
   if (elements.timeLimit) elements.timeLimit.value = '';
   if (elements.openLimit) elements.openLimit.value = '';
   
@@ -508,17 +509,16 @@ function setupNewSiteForm(hostname) {
  * @private
  */
 function validateForm() {
-  if (!elements.timeLimit || !elements.openLimit || !elements.urlPattern || !elements.submitBtn) {
+  if (!elements.timeLimit || !elements.openLimit || !elements.submitBtn) {
     return;
   }
   
   const timeValue = parseInt(elements.timeLimit.value);
   const openValue = parseInt(elements.openLimit.value);
-  const urlValue = elements.urlPattern.value.trim();
   
   // Clear any existing validation styles
   requestAnimationFrame(() => {
-    [elements.timeLimit, elements.openLimit, elements.urlPattern].forEach(input => {
+    [elements.timeLimit, elements.openLimit].forEach(input => {
       if (input) {
         input.classList.remove('error', 'valid');
       }
@@ -528,18 +528,7 @@ function validateForm() {
   let isValid = true;
   let errorMessages = [];
   
-  // URL pattern validation
-  if (!urlValue) {
-    errorMessages.push('URL pattern is required');
-    if (elements.urlPattern) elements.urlPattern.classList.add('error');
-    isValid = false;
-  } else if (urlValue.length < 3) {
-    errorMessages.push('URL pattern must be at least 3 characters');
-    if (elements.urlPattern) elements.urlPattern.classList.add('error');
-    isValid = false;
-  } else {
-    if (elements.urlPattern) elements.urlPattern.classList.add('valid');
-  }
+  // QA FIX: Removed URL pattern validation - auto-detect from current tab
   
   // At least one limit must be specified
   const hasTimeLimit = !isNaN(timeValue) && timeValue > 0;
@@ -593,13 +582,14 @@ function validateForm() {
 async function handleFormSubmit(event) {
   event.preventDefault();
   
-  const urlPattern = elements.urlPattern.value.trim();
+  // QA FIX: Get hostname from stored data attribute instead of input field
+  const urlPattern = elements.limitsForm.dataset.hostname;
   const timeLimit = elements.timeLimit.value;
   const openLimit = elements.openLimit.value;
   
   // Validate inputs
   if (!urlPattern) {
-    showError('Please enter a URL pattern');
+    showError('Unable to detect current site. Please try again.');
     return;
   }
   

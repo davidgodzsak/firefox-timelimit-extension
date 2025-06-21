@@ -152,11 +152,12 @@ class SettingsManager {
             this.handleAddNote();
         });
         
-        // Input validation and touch tracking
-        this.elements.siteUrlInput.addEventListener('input', this.validateSiteUrl.bind(this));
-        this.elements.timeLimitInput.addEventListener('input', this.validateTimeLimit.bind(this));
-        this.elements.openLimitInput.addEventListener('input', this.validateOpenLimit.bind(this)); // NEW: Open limit validation
-        this.elements.noteTextInput.addEventListener('input', this.validateNoteText.bind(this));
+        // QA FIX: Change validation trigger from input to blur for better UX
+        // This prevents premature validation warnings while typing
+        this.elements.siteUrlInput.addEventListener('blur', this.validateSiteUrl.bind(this));
+        this.elements.timeLimitInput.addEventListener('blur', this.validateTimeLimit.bind(this));
+        this.elements.openLimitInput.addEventListener('blur', this.validateOpenLimit.bind(this)); // NEW: Open limit validation
+        this.elements.noteTextInput.addEventListener('blur', this.validateNoteText.bind(this));
         
         // Track when inputs are touched for validation styling
         [this.elements.siteUrlInput, this.elements.timeLimitInput, this.elements.openLimitInput, this.elements.noteTextInput].forEach(input => {

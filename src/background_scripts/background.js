@@ -85,6 +85,26 @@ async function handleAlarm(alarm) {
             console.log(`[Background] Updating badge for tracked tab ${trackingInfo.tabId} after usage update`);
             await updateBadge(trackingInfo.tabId);
             
+            // QA FIX: Check if current site should be blocked due to time limit being exceeded
+            // This implements automatic timeout redirect when limits are reached
+            try {
+              const tab = await browser.tabs.get(trackingInfo.tabId);
+              if (tab && tab.url && !tab.url.includes('ui/timeout/timeout.html')) {
+                console.log(`[Background] Checking if current site should be blocked after usage update`);
+                const wasRedirected = await handlePotentialRedirect(trackingInfo.tabId, tab.url);
+                if (wasRedirected) {
+                  console.log(`[Background] Automatically redirected tab ${trackingInfo.tabId} to timeout page due to time limit`);
+                  // Stop tracking since we're redirecting to timeout page
+                  await stopTracking();
+                  await browser.alarms.clear('usageTimer');
+                  return; // Exit early since we redirected
+                }
+              }
+            } catch (error) {
+              console.warn('[Background] Error checking automatic timeout redirect:', error);
+              // Continue with normal flow if redirect check fails
+            }
+            
             // Broadcast usage update to UI components
             await broadcastToUIComponents('usageUpdated', { 
               siteId: trackingInfo.siteId,
@@ -333,10 +353,10 @@ async function handleTabActivity(tabId, url, shouldTrack) {
       try {
         // Clear any existing timer first to avoid duplicates
         await browser.alarms.clear('usageTimer');
-        // FIXED: Use 15-second intervals for more accurate tracking in Firefox
-        // Firefox doesn't have Chrome's 1-minute minimum limitation for packed extensions
-        await browser.alarms.create('usageTimer', { periodInMinutes: 0.25 }); // 15 seconds
-        console.log('[Background] Created usage timer alarm (15 second intervals)');
+        // QA FIX: Use 2-second intervals for real-time badge updates as per QA requirements
+        // This provides responsive badge updates while maintaining good performance
+        await browser.alarms.create('usageTimer', { periodInMinutes: 2/60 }); // 2 seconds (2/60 = 0.033 minutes)
+        console.log('[Background] Created usage timer alarm (2 second intervals)');
       } catch (error) {
         console.warn('[Background] Error creating usage timer alarm:', error);
       }

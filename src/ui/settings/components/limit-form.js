@@ -50,21 +50,14 @@ export class LimitForm {
       <div class="limit-form-header">
         <div class="site-info">
           <h4 class="site-url">${this.escapeHtml(this.siteData.urlPattern)}</h4>
-          <div class="site-status ${this.siteData.isEnabled ? 'enabled' : 'disabled'}">
-            ${this.siteData.isEnabled ? 'Enabled' : 'Disabled'}
-          </div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-secondary btn-small toggle-site-btn ${this.siteData.isEnabled ? 'enabled' : 'disabled'}" 
-                  type="button" title="${this.siteData.isEnabled ? 'Disable' : 'Enable'} site">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              ${this.siteData.isEnabled 
-                ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-                : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
-              }
-            </svg>
-            ${this.siteData.isEnabled ? ' Disable' : ' Enable'}
-          </button>
+          <!-- QA FIX: Replace redundant badge + button with single toggle switch -->
+          <label class="toggle-switch" title="${this.siteData.isEnabled ? 'Disable' : 'Enable'} site">
+            <input type="checkbox" class="toggle-site-checkbox" ${this.siteData.isEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">${this.siteData.isEnabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
           <button class="btn btn-danger btn-small delete-site-btn" type="button" title="Delete site">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3,6 5,6 21,6"/>
@@ -89,14 +82,14 @@ export class LimitForm {
     `;
     
     // Get element references
-    this.elements.toggleBtn = this.container.querySelector('.toggle-site-btn');
+    this.elements.toggleCheckbox = this.container.querySelector('.toggle-site-checkbox');
+    this.elements.toggleLabel = this.container.querySelector('.toggle-label');
     this.elements.deleteBtn = this.container.querySelector('.delete-site-btn');
     this.elements.timeLimitEditor = this.container.querySelector('#time-limit-editor');
     this.elements.openLimitEditor = this.container.querySelector('#open-limit-editor');
-    this.elements.siteStatus = this.container.querySelector('.site-status');
     
     // Setup event listeners
-    this.elements.toggleBtn.addEventListener('click', () => this.handleToggle());
+    this.elements.toggleCheckbox.addEventListener('change', () => this.handleToggle());
     this.elements.deleteBtn.addEventListener('click', () => this.handleDelete());
   }
   
@@ -221,51 +214,38 @@ export class LimitForm {
   }
   
   /**
-   * Handles toggle button click (enable/disable site).
+   * Handles toggle switch change (enable/disable site).
    * @private
    */
   async handleToggle() {
-    const newEnabledState = !this.siteData.isEnabled;
+    const newEnabledState = this.elements.toggleCheckbox.checked;
     
     try {
-      this.elements.toggleBtn.disabled = true;
+      this.elements.toggleCheckbox.disabled = true;
       
       await this.onUpdate(this.siteData.id, { isEnabled: newEnabledState });
       
       this.siteData.isEnabled = newEnabledState;
-      this.updateToggleButton();
+      this.updateToggleSwitch();
       
     } catch (error) {
       console.error('[LimitForm] Error toggling site:', error);
-      // You could show an error message here
+      // Revert checkbox state on error
+      this.elements.toggleCheckbox.checked = this.siteData.isEnabled;
     } finally {
-      this.elements.toggleBtn.disabled = false;
+      this.elements.toggleCheckbox.disabled = false;
     }
   }
   
   /**
-   * Updates the toggle button appearance.
+   * Updates the toggle switch appearance.
    * @private
    */
-  updateToggleButton() {
+  updateToggleSwitch() {
     const isEnabled = this.siteData.isEnabled;
     
-    this.elements.toggleBtn.className = `btn btn-secondary btn-small toggle-site-btn ${isEnabled ? 'enabled' : 'disabled'}`;
-    this.elements.toggleBtn.title = `${isEnabled ? 'Disable' : 'Enable'} site`;
-    
-    this.elements.siteStatus.className = `site-status ${isEnabled ? 'enabled' : 'disabled'}`;
-    this.elements.siteStatus.textContent = isEnabled ? 'Enabled' : 'Disabled';
-    
-    // Update icon and text
-    this.elements.toggleBtn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        ${isEnabled 
-          ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-          : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
-        }
-      </svg>
-      ${isEnabled ? ' Disable' : ' Enable'}
-    `;
+    this.elements.toggleCheckbox.checked = isEnabled;
+    this.elements.toggleLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
   }
   
   /**
@@ -306,8 +286,8 @@ export class LimitForm {
     const openLimitDisplay = openLimit > 0 ? `${openLimit} opens` : 'No limit';
     this.editors.openLimit.updateValue(openLimitDisplay);
     
-    // Update toggle button
-    this.updateToggleButton();
+    // Update toggle switch
+    this.updateToggleSwitch();
   }
   
   /**

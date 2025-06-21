@@ -1,19 +1,5 @@
-- new popup ui/ux is bad, does not follow the design of the existing app
-- new popup should show how much time was spent already, how much opens are already spent
-- new popup does not allow adding a limit easily 
-- new popup has a sun icon instead of cogwheel for settings
-- the checkmark button disappears on the settings screen when I write to the input field
-- timout page does not kick in after the time is spent on the page, seems like it's not even tracking usage
-- the popup does not contain any input for adding a new site limit when opening a site that never had a limit set up
-- the popup button is not following the same design as the buttons in the settings page (edit, delete buttons don't use the icons).
-- popup should not show edit or delete limits buttons, it makes it too easy to make changes and a user could use this to avoid the limits.
-- popup settings button is a sun icon not a cogwheel icon
-- the popup shows a progress bar in th
-- time limit page has a bug: Uncaught SyntaxError: import declarations may only appear at top level of a module in the logs
-- settings page input is marked with red border as if it had a validation error, even before touching the field.
-- on the settings page, the distracting site entries have buttons for edit and delete, but these don't match the edit and delete buttons of the motivational notes entries, the ones in the motivational notes are preferred.
-- settings page add note button is not inline with the input field for the suggestion.
-- settings page site entry enabled/disabled indicator should be inline with the site name, and it should only be a badge, now it fills the whole width of the row.
-- settings page enabled/disabled indicator does not have a good contrast with the background, it's barely visible.
-- popup page has a progress bar for both limitations (time, open) but the progress bar is not updated, it does not show how much was used of the allowed time/opens
-- after changing a site's limit to a higher number the site is still blocked not shown again. 
+- on the settings page motivational notes section: the activity suggestion input should be in the same line as the add note button
+- on the settings page header there is a broken icon, this should be an icon form inside the assets/icons folder
+- the popup, when showing a page that has been added as distracting has a redundant text at the bottom telling the settings for the page, as the progressbars are already enough above
+- on the settings page when I want to edit a time limit or an open limit for a site, the save button next to it is invisible by default and only appears when I hover over the place where it should be
+- the website url validator does not show a a warning if the focus leaves the url field on the settings page
