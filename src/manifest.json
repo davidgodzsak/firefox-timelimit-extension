@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Distraction Limiter",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached. Features customizable time limits, motivational timeout notes, and clean modern UI.",
   "author": "Dávid Godzsák",
   "homepage_url": "https://github.com/davidgodzsak/firefox-timelimit-extension",
@@ -20,18 +20,10 @@
     "default_popup": "ui/popup/popup.html"
   },
   "background": {
-    "scripts": [
-      "background_scripts/background.js"
-    ],
+    "scripts": ["background_scripts/background.js"],
     "type": "module"
   },
-  "permissions": [
-    "storage",
-    "alarms",
-    "tabs",
-    "webNavigation",
-    "activeTab"
-  ],
+  "permissions": ["storage", "alarms", "tabs", "webNavigation", "activeTab"],
   "options_ui": {
     "page": "ui/settings/settings.html",
     "open_in_tab": true
@@ -50,9 +42,7 @@
         "ui/common_assets/css/variables.css",
         "ui/common_assets/css/global.css"
       ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "matches": ["<all_urls>"]
     }
   ],
   "default_locale": "en",

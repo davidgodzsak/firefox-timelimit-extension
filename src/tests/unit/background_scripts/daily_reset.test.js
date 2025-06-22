@@ -1,4 +1,11 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
 /**
  * @file daily_reset.test.js
@@ -25,15 +32,19 @@ global.browser = {
 };
 
 // Mock usage_storage module
-jest.unstable_mockModule('../../../background_scripts/usage_storage.js', () => ({
-  getUsageStats: jest.fn(),
-}));
+jest.unstable_mockModule(
+  '../../../background_scripts/usage_storage.js',
+  () => ({
+    getUsageStats: jest.fn(),
+  })
+);
 
-const { getUsageStats } = await import('../../../background_scripts/usage_storage.js');
-const { 
-  initializeDailyResetAlarm, 
-  performDailyReset 
-} = await import('../../../background_scripts/daily_reset.js');
+const { getUsageStats } = await import(
+  '../../../background_scripts/usage_storage.js'
+);
+const { initializeDailyResetAlarm, performDailyReset } = await import(
+  '../../../background_scripts/daily_reset.js'
+);
 
 describe('daily_reset.js', () => {
   let consoleSpy;
@@ -44,15 +55,15 @@ describe('daily_reset.js', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     // Mock console methods
     consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    
+
     // Initialize mock storage data
     mockStorageData = {};
-    
+
     // Mock storage.local.get to return mock data
     mockStorageArea.get.mockImplementation(async (key) => {
       if (key === null) {
@@ -65,11 +76,11 @@ describe('daily_reset.js', () => {
       }
       return Promise.resolve(result);
     });
-    
+
     // Mock storage.local.remove
     mockStorageArea.remove.mockImplementation(async (keys) => {
       const keysArray = Array.isArray(keys) ? keys : [keys];
-      keysArray.forEach(key => delete mockStorageData[key]);
+      keysArray.forEach((key) => delete mockStorageData[key]);
       return Promise.resolve();
     });
   });
@@ -84,9 +95,9 @@ describe('daily_reset.js', () => {
     it('should create alarm with correct parameters', async () => {
       const mockAlarm = {
         name: 'dailyResetAlarm',
-        scheduledTime: Date.now() + 86400000 // 24 hours from now
+        scheduledTime: Date.now() + 86400000, // 24 hours from now
       };
-      
+
       mockAlarmsAPI.create.mockResolvedValueOnce(undefined);
       mockAlarmsAPI.get.mockResolvedValueOnce(mockAlarm);
 
@@ -94,31 +105,36 @@ describe('daily_reset.js', () => {
 
       expect(mockAlarmsAPI.create).toHaveBeenCalledWith('dailyResetAlarm', {
         when: expect.any(Number),
-        periodInMinutes: 24 * 60
+        periodInMinutes: 24 * 60,
       });
-      
+
       expect(mockAlarmsAPI.get).toHaveBeenCalledWith('dailyResetAlarm');
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[DailyReset] Alarm "dailyResetAlarm" created/updated')
+        expect.stringContaining(
+          '[DailyReset] Alarm "dailyResetAlarm" created/updated'
+        )
       );
     });
 
     it('should calculate next midnight correctly', async () => {
       mockAlarmsAPI.create.mockResolvedValueOnce(undefined);
-      mockAlarmsAPI.get.mockResolvedValueOnce({ name: 'dailyResetAlarm', scheduledTime: Date.now() });
+      mockAlarmsAPI.get.mockResolvedValueOnce({
+        name: 'dailyResetAlarm',
+        scheduledTime: Date.now(),
+      });
 
       await initializeDailyResetAlarm();
 
       const createCall = mockAlarmsAPI.create.mock.calls[0];
       const scheduledTime = createCall[1].when;
       const scheduledDate = new Date(scheduledTime);
-      
+
       // Should be scheduled for midnight (00:00:00)
       expect(scheduledDate.getHours()).toBe(0);
       expect(scheduledDate.getMinutes()).toBe(0);
       expect(scheduledDate.getSeconds()).toBe(0);
       expect(scheduledDate.getMilliseconds()).toBe(0);
-      
+
       // Should be tomorrow or later
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -133,7 +149,9 @@ describe('daily_reset.js', () => {
       await initializeDailyResetAlarm();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[DailyReset] Alarm "dailyResetAlarm" was scheduled, but could not be retrieved')
+        expect.stringContaining(
+          '[DailyReset] Alarm "dailyResetAlarm" was scheduled, but could not be retrieved'
+        )
       );
     });
 
@@ -141,8 +159,13 @@ describe('daily_reset.js', () => {
       const error = new Error('Alarm creation failed');
       mockAlarmsAPI.create.mockRejectedValueOnce(error);
 
-      await expect(initializeDailyResetAlarm()).rejects.toThrow('Alarm creation failed');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[DailyReset] Error creating/updating daily reset alarm:', error);
+      await expect(initializeDailyResetAlarm()).rejects.toThrow(
+        'Alarm creation failed'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[DailyReset] Error creating/updating daily reset alarm:',
+        error
+      );
     });
   });
 
@@ -165,9 +188,13 @@ describe('daily_reset.js', () => {
       // Set up mock storage with usage data from multiple days
       mockStorageData = {
         [`usageStats-${today}`]: { site1: { timeSpentSeconds: 100, opens: 2 } },
-        [`usageStats-${yesterday}`]: { site2: { timeSpentSeconds: 200, opens: 3 } },
-        [`usageStats-${twoDaysAgo}`]: { site3: { timeSpentSeconds: 150, opens: 1 } },
-        'otherData': { someKey: 'someValue' }, // Non-usage data should be preserved
+        [`usageStats-${yesterday}`]: {
+          site2: { timeSpentSeconds: 200, opens: 3 },
+        },
+        [`usageStats-${twoDaysAgo}`]: {
+          site3: { timeSpentSeconds: 150, opens: 1 },
+        },
+        otherData: { someKey: 'someValue' }, // Non-usage data should be preserved
       };
 
       const currentDayStats = { site1: { timeSpentSeconds: 100, opens: 2 } };
@@ -178,31 +205,40 @@ describe('daily_reset.js', () => {
       // Should remove old usage stats but keep current day and other data
       expect(mockStorageArea.remove).toHaveBeenCalledWith([
         `usageStats-${yesterday}`,
-        `usageStats-${twoDaysAgo}`
+        `usageStats-${twoDaysAgo}`,
       ]);
-      
+
       // Verify current day stats were queried
       expect(getUsageStats).toHaveBeenCalledWith(today);
-      
+
       // Check logging
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('[DailyReset] Starting daily reset process')
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[DailyReset] Removing 2 old usage statistics entries:'),
-        expect.arrayContaining([`usageStats-${yesterday}`, `usageStats-${twoDaysAgo}`])
+        expect.stringContaining(
+          '[DailyReset] Removing 2 old usage statistics entries:'
+        ),
+        expect.arrayContaining([
+          `usageStats-${yesterday}`,
+          `usageStats-${twoDaysAgo}`,
+        ])
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`[DailyReset] Current day (${today}) has 1 site(s) with usage data - preserved`)
+        expect.stringContaining(
+          `[DailyReset] Current day (${today}) has 1 site(s) with usage data - preserved`
+        )
       );
-      expect(consoleSpy).toHaveBeenCalledWith('[DailyReset] Daily reset completed successfully');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[DailyReset] Daily reset completed successfully'
+      );
     });
 
     it('should handle case with no old usage statistics', async () => {
       // Only current day data
       mockStorageData = {
         [`usageStats-${today}`]: { site1: { timeSpentSeconds: 100, opens: 2 } },
-        'otherData': { someKey: 'someValue' },
+        otherData: { someKey: 'someValue' },
       };
 
       const currentDayStats = { site1: { timeSpentSeconds: 100, opens: 2 } };
@@ -212,14 +248,16 @@ describe('daily_reset.js', () => {
 
       // Should not call remove since there are no old stats
       expect(mockStorageArea.remove).not.toHaveBeenCalled();
-      
-      expect(consoleSpy).toHaveBeenCalledWith('[DailyReset] No old usage statistics found to remove');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[DailyReset] No old usage statistics found to remove'
+      );
     });
 
     it('should handle case with no usage statistics at all', async () => {
       // No usage data
       mockStorageData = {
-        'otherData': { someKey: 'someValue' },
+        otherData: { someKey: 'someValue' },
       };
 
       getUsageStats.mockResolvedValueOnce({});
@@ -227,9 +265,13 @@ describe('daily_reset.js', () => {
       await performDailyReset();
 
       expect(mockStorageArea.remove).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith('[DailyReset] No old usage statistics found to remove');
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`[DailyReset] Current day (${today}) has 0 site(s) with usage data - preserved`)
+        '[DailyReset] No old usage statistics found to remove'
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `[DailyReset] Current day (${today}) has 0 site(s) with usage data - preserved`
+        )
       );
     });
 
@@ -237,32 +279,48 @@ describe('daily_reset.js', () => {
       const error = new Error('Storage access failed');
       mockStorageArea.get.mockRejectedValueOnce(error);
 
-      await expect(performDailyReset()).rejects.toThrow('Storage access failed');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[DailyReset] Error during daily reset:', error);
+      await expect(performDailyReset()).rejects.toThrow(
+        'Storage access failed'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[DailyReset] Error during daily reset:',
+        error
+      );
     });
 
     it('should handle storage remove error gracefully', async () => {
       mockStorageData = {
-        [`usageStats-${yesterday}`]: { site2: { timeSpentSeconds: 200, opens: 3 } },
+        [`usageStats-${yesterday}`]: {
+          site2: { timeSpentSeconds: 200, opens: 3 },
+        },
       };
 
       const error = new Error('Storage remove failed');
       mockStorageArea.remove.mockRejectedValueOnce(error);
 
-      await expect(performDailyReset()).rejects.toThrow('Storage remove failed');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[DailyReset] Error during daily reset:', error);
+      await expect(performDailyReset()).rejects.toThrow(
+        'Storage remove failed'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[DailyReset] Error during daily reset:',
+        error
+      );
     });
 
     it('should handle getUsageStats error gracefully', async () => {
       mockStorageData = {
-        [`usageStats-${yesterday}`]: { site2: { timeSpentSeconds: 200, opens: 3 } },
+        [`usageStats-${yesterday}`]: {
+          site2: { timeSpentSeconds: 200, opens: 3 },
+        },
       };
 
       // First get() call for all storage succeeds, but getUsageStats fails
       const error = new Error('Usage stats access failed');
       getUsageStats.mockRejectedValueOnce(error);
 
-      await expect(performDailyReset()).rejects.toThrow('Usage stats access failed');
+      await expect(performDailyReset()).rejects.toThrow(
+        'Usage stats access failed'
+      );
     });
   });
-}); 
+});

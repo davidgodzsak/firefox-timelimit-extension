@@ -1,7 +1,7 @@
 /**
  * @file badge_system_integration.test.js
  * @description Integration tests for Badge System in the Event-Driven Architecture
- * 
+ *
  * Tests verify that:
  * - Badge system integrates properly with the event-driven background script
  * - Badge text updates correctly when called from background.js
@@ -9,7 +9,14 @@
  * - Error handling works properly in the integrated system
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
 // Mock browser APIs
 const mockActionArea = {
@@ -41,22 +48,31 @@ global.crypto = {
 
 // Create mock modules before importing
 const mockSiteStorage = {
-  getDistractingSites: jest.fn()
+  getDistractingSites: jest.fn(),
 };
 
 const mockUsageStorage = {
-  getUsageStats: jest.fn()
+  getUsageStats: jest.fn(),
 };
 
 const mockDistractionDetector = {
   checkIfUrlIsDistracting: jest.fn(),
-  initializeDistractionDetector: jest.fn()
+  initializeDistractionDetector: jest.fn(),
 };
 
 // Mock the modules before importing
-jest.unstable_mockModule('../../background_scripts/site_storage.js', () => mockSiteStorage);
-jest.unstable_mockModule('../../background_scripts/usage_storage.js', () => mockUsageStorage);
-jest.unstable_mockModule('../../background_scripts/distraction_detector.js', () => mockDistractionDetector);
+jest.unstable_mockModule(
+  '../../background_scripts/site_storage.js',
+  () => mockSiteStorage
+);
+jest.unstable_mockModule(
+  '../../background_scripts/usage_storage.js',
+  () => mockUsageStorage
+);
+jest.unstable_mockModule(
+  '../../background_scripts/distraction_detector.js',
+  () => mockDistractionDetector
+);
 
 describe('Badge System Integration', () => {
   let mockLocalStorageData;
@@ -79,7 +95,7 @@ describe('Badge System Integration', () => {
         return Promise.resolve(result);
       } else if (Array.isArray(key)) {
         const result = {};
-        key.forEach(k => {
+        key.forEach((k) => {
           if (mockLocalStorageData[k] !== undefined) {
             result[k] = mockLocalStorageData[k];
           }
@@ -95,7 +111,9 @@ describe('Badge System Integration', () => {
     });
 
     // Setup UUID generation
-    global.crypto.randomUUID.mockImplementation(() => `test-uuid-${++uuidCounter}`);
+    global.crypto.randomUUID.mockImplementation(
+      () => `test-uuid-${++uuidCounter}`
+    );
 
     // Setup console spy
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -116,15 +134,17 @@ describe('Badge System Integration', () => {
       return mockLocalStorageData[`usageStats-${dateKey}`] || {};
     });
 
-    mockDistractionDetector.checkIfUrlIsDistracting.mockImplementation((url) => {
-      const sites = mockLocalStorageData.distractingSites || [];
-      for (const site of sites) {
-        if (url.includes(site.urlPattern)) {
-          return { isMatch: true, siteId: site.id };
+    mockDistractionDetector.checkIfUrlIsDistracting.mockImplementation(
+      (url) => {
+        const sites = mockLocalStorageData.distractingSites || [];
+        for (const site of sites) {
+          if (url.includes(site.urlPattern)) {
+            return { isMatch: true, siteId: site.id };
+          }
         }
+        return { isMatch: false, siteId: null };
       }
-      return { isMatch: false, siteId: null };
-    });
+    );
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -148,21 +168,21 @@ describe('Badge System Integration', () => {
         id: 'site1',
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600, // 1 hour
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       // Setup usage data: 1800 seconds used = 30 minutes, so 30 minutes remaining
       const dateKey = new Date().toISOString().split('T')[0];
       mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site1: { timeSpentSeconds: 1800, opens: 3 } // 30 minutes used
+        site1: { timeSpentSeconds: 1800, opens: 3 }, // 30 minutes used
       };
 
       // Mock tab
       const mockTab = {
         id: 123,
         url: 'https://facebook.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -171,12 +191,12 @@ describe('Badge System Integration', () => {
 
       // Verify badge was set correctly (3600 - 1800 = 1800 seconds = 30 minutes)
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "30m", // 30 minutes remaining
-        tabId: 123
+        text: '30m', // 30 minutes remaining
+        tabId: 123,
       });
       expect(mockActionArea.setBadgeBackgroundColor).toHaveBeenCalledWith({
         color: [0, 122, 255, 255],
-        tabId: 123
+        tabId: 123,
       });
     });
 
@@ -184,15 +204,15 @@ describe('Badge System Integration', () => {
       const mockTab = {
         id: 456,
         url: 'https://example.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
       await badgeManager.updateBadge(456);
 
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 456
+        text: '',
+        tabId: 456,
       });
     });
 
@@ -203,20 +223,20 @@ describe('Badge System Integration', () => {
         urlPattern: 'youtube.com',
         dailyLimitSeconds: 7200, // 2 hours
         dailyOpenLimit: 10,
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       // Setup usage data with both time and opens used
       const dateKey = new Date().toISOString().split('T')[0];
       mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site2: { timeSpentSeconds: 3600, opens: 7 } // 1 hour used, 7 opens used
+        site2: { timeSpentSeconds: 3600, opens: 7 }, // 1 hour used, 7 opens used
       };
 
       const mockTab = {
         id: 789,
         url: 'https://youtube.com/watch?v=test',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -224,8 +244,8 @@ describe('Badge System Integration', () => {
 
       // Should show remaining time and remaining opens
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "1h/3", // 1 hour remaining / 3 opens remaining
-        tabId: 789
+        text: '1h/3', // 1 hour remaining / 3 opens remaining
+        tabId: 789,
       });
     });
 
@@ -236,20 +256,20 @@ describe('Badge System Integration', () => {
         urlPattern: 'reddit.com',
         dailyLimitSeconds: 1800, // 30 minutes
         dailyOpenLimit: 5,
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       // Setup usage data with exceeded limits
       const dateKey = new Date().toISOString().split('T')[0];
       mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site3: { timeSpentSeconds: 2400, opens: 8 } // 40 minutes used, 8 opens used
+        site3: { timeSpentSeconds: 2400, opens: 8 }, // 40 minutes used, 8 opens used
       };
 
       const mockTab = {
         id: 101,
         url: 'https://reddit.com/r/test',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -257,8 +277,8 @@ describe('Badge System Integration', () => {
 
       // Should show zeros for exceeded limits
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "0s/0", // 0 time remaining / 0 opens remaining
-        tabId: 101
+        text: '0s/0', // 0 time remaining / 0 opens remaining
+        tabId: 101,
       });
     });
 
@@ -268,14 +288,14 @@ describe('Badge System Integration', () => {
         id: 'site4',
         urlPattern: 'twitter.com',
         dailyLimitSeconds: 3600,
-        isEnabled: false // Disabled
+        isEnabled: false, // Disabled
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       const mockTab = {
         id: 202,
         url: 'https://twitter.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -283,8 +303,8 @@ describe('Badge System Integration', () => {
 
       // Should clear badge for disabled sites
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 202
+        text: '',
+        tabId: 202,
       });
     });
   });
@@ -297,7 +317,7 @@ describe('Badge System Integration', () => {
       const mockTab = {
         id: 303,
         url: 'https://facebook.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -305,8 +325,8 @@ describe('Badge System Integration', () => {
 
       // Should clear badge on storage error
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 303
+        text: '',
+        tabId: 303,
       });
     });
 
@@ -317,8 +337,8 @@ describe('Badge System Integration', () => {
 
       // Should attempt to clear badge even on tab error
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 404
+        text: '',
+        tabId: 404,
       });
     });
 
@@ -327,19 +347,21 @@ describe('Badge System Integration', () => {
         id: 'site5',
         urlPattern: 'instagram.com',
         dailyLimitSeconds: 1800,
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       const mockTab = {
         id: 505,
         url: 'https://instagram.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
       // Mock badge API error
-      mockActionArea.setBadgeText.mockRejectedValue(new Error('Badge API error'));
+      mockActionArea.setBadgeText.mockRejectedValue(
+        new Error('Badge API error')
+      );
 
       await expect(badgeManager.updateBadge(505)).resolves.not.toThrow();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -356,7 +378,7 @@ describe('Badge System Integration', () => {
         id: 'site6',
         urlPattern: 'github.com',
         dailyLimitSeconds: 7200, // 2 hours
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
       // No usage data in storage
@@ -364,7 +386,7 @@ describe('Badge System Integration', () => {
       const mockTab = {
         id: 606,
         url: 'https://github.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -372,8 +394,8 @@ describe('Badge System Integration', () => {
 
       // Should show full limit when no usage data
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "2h", // Full 2 hours
-        tabId: 606
+        text: '2h', // Full 2 hours
+        tabId: 606,
       });
     });
 
@@ -384,7 +406,7 @@ describe('Badge System Integration', () => {
       const mockTab = {
         id: 707,
         url: 'https://unknown-distracting-site.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -392,8 +414,8 @@ describe('Badge System Integration', () => {
 
       // Should clear badge for sites not in storage
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 707
+        text: '',
+        tabId: 707,
       });
     });
 
@@ -401,7 +423,7 @@ describe('Badge System Integration', () => {
       const mockTab = {
         id: 808,
         url: 'chrome://settings/',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -409,8 +431,8 @@ describe('Badge System Integration', () => {
 
       // Should clear badge for internal pages
       expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-        text: "",
-        tabId: 808
+        text: '',
+        tabId: 808,
       });
     });
   });
@@ -421,14 +443,14 @@ describe('Badge System Integration', () => {
         id: 'site7',
         urlPattern: 'example.com',
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       const mockTab = {
         id: 909,
         url: 'https://example.com',
-        status: 'complete'
+        status: 'complete',
       };
       mockTabsArea.get.mockResolvedValue(mockTab);
 
@@ -442,7 +464,7 @@ describe('Badge System Integration', () => {
 
       // All calls should complete without errors
       const results = await Promise.allSettled(promises);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.status).toBe('fulfilled');
       });
     });
@@ -452,37 +474,37 @@ describe('Badge System Integration', () => {
         id: 'site8',
         urlPattern: 'multitab-site.com',
         dailyLimitSeconds: 1800, // 30 minutes
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [testSite];
 
       const dateKey = new Date().toISOString().split('T')[0];
       mockLocalStorageData[`usageStats-${dateKey}`] = {
-        site8: { timeSpentSeconds: 600, opens: 2 } // 10 minutes used
+        site8: { timeSpentSeconds: 600, opens: 2 }, // 10 minutes used
       };
 
       // Setup multiple tabs for the same site
       const tabs = [
         { id: 1001, url: 'https://multitab-site.com/page1' },
         { id: 1002, url: 'https://multitab-site.com/page2' },
-        { id: 1003, url: 'https://multitab-site.com/page3' }
+        { id: 1003, url: 'https://multitab-site.com/page3' },
       ];
 
       // Mock tab.get to return appropriate tab for each call
       mockTabsArea.get.mockImplementation(async (tabId) => {
-        return tabs.find(tab => tab.id === tabId);
+        return tabs.find((tab) => tab.id === tabId);
       });
 
       // Update badges for all tabs
-      await Promise.all(tabs.map(tab => badgeManager.updateBadge(tab.id)));
+      await Promise.all(tabs.map((tab) => badgeManager.updateBadge(tab.id)));
 
       // All tabs should show the same badge text
-      tabs.forEach(tab => {
+      tabs.forEach((tab) => {
         expect(mockActionArea.setBadgeText).toHaveBeenCalledWith({
-          text: "20m", // 20 minutes remaining (30 - 10)
-          tabId: tab.id
+          text: '20m', // 20 minutes remaining (30 - 10)
+          tabId: tab.id,
         });
       });
     });
   });
-}); 
+});

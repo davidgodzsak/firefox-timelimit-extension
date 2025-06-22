@@ -16,11 +16,10 @@ import {
   createValidationError,
   validateRequiredFields,
   validateSiteObject,
-  ERROR_TYPES
+  ERROR_TYPES,
 } from '../../../background_scripts/validation_utils.js';
 
 describe('ValidationUtils', () => {
-  
   describe('validateUrlPattern', () => {
     test('should validate correct URL patterns', () => {
       const result = validateUrlPattern('example.com');
@@ -128,7 +127,7 @@ describe('ValidationUtils', () => {
       urlPattern: 'example.com',
       isEnabled: true,
       dailyLimitSeconds: 3600,
-      dailyOpenLimit: 10
+      dailyOpenLimit: 10,
     };
 
     test('should validate complete site object', () => {
@@ -139,7 +138,7 @@ describe('ValidationUtils', () => {
         urlPattern: 'example.com',
         isEnabled: true,
         dailyLimitSeconds: 3600,
-        dailyOpenLimit: 10
+        dailyOpenLimit: 10,
       });
     });
 
@@ -148,7 +147,7 @@ describe('ValidationUtils', () => {
         id: 'test-site',
         urlPattern: 'example.com',
         isEnabled: true,
-        dailyLimitSeconds: 3600
+        dailyLimitSeconds: 3600,
       };
       const result = validateSiteObject(timeOnlySite);
       expect(result.isValid).toBe(true);
@@ -161,7 +160,7 @@ describe('ValidationUtils', () => {
         id: 'test-site',
         urlPattern: 'example.com',
         isEnabled: true,
-        dailyOpenLimit: 10
+        dailyOpenLimit: 10,
       };
       const result = validateSiteObject(openOnlySite);
       expect(result.isValid).toBe(true);
@@ -173,7 +172,7 @@ describe('ValidationUtils', () => {
       const noLimitsSite = {
         id: 'test-site',
         urlPattern: 'example.com',
-        isEnabled: true
+        isEnabled: true,
       };
       const result = validateSiteObject(noLimitsSite);
       expect(result.isValid).toBe(false);
@@ -182,7 +181,7 @@ describe('ValidationUtils', () => {
 
     test('should reject site without required fields', () => {
       const incompleteSite = {
-        id: 'test-site'
+        id: 'test-site',
         // missing urlPattern and isEnabled
       };
       const result = validateSiteObject(incompleteSite);
@@ -193,7 +192,7 @@ describe('ValidationUtils', () => {
     test('should reject site with invalid URL pattern', () => {
       const invalidUrlSite = {
         ...validSite,
-        urlPattern: 'javascript:alert()'
+        urlPattern: 'javascript:alert()',
       };
       const result = validateSiteObject(invalidUrlSite);
       expect(result.isValid).toBe(false);
@@ -205,7 +204,7 @@ describe('ValidationUtils', () => {
         id: 'test-site',
         urlPattern: 'example.com',
         isEnabled: true,
-        dailyLimitSeconds: 90000 // Invalid - exceeds 24 hours (86400 seconds)
+        dailyLimitSeconds: 90000, // Invalid - exceeds 24 hours (86400 seconds)
       };
       const result = validateSiteObject(invalidTimeSite);
       expect(result.isValid).toBe(false);
@@ -215,7 +214,7 @@ describe('ValidationUtils', () => {
     test('should reject site with invalid open limit', () => {
       const invalidOpenSite = {
         ...validSite,
-        dailyOpenLimit: 2000
+        dailyOpenLimit: 2000,
       };
       const result = validateSiteObject(invalidOpenSite);
       expect(result.isValid).toBe(false);
@@ -287,8 +286,12 @@ describe('ValidationUtils', () => {
   describe('safeBrowserApiCall', () => {
     test('should handle successful API calls', async () => {
       const mockApiCall = jest.fn().mockResolvedValue('success');
-      const result = await safeBrowserApiCall(mockApiCall, ['arg1', 'arg2'], 'Test API');
-      
+      const result = await safeBrowserApiCall(
+        mockApiCall,
+        ['arg1', 'arg2'],
+        'Test API'
+      );
+
       expect(result.success).toBe(true);
       expect(result.data).toBe('success');
       expect(result.error).toBeNull();
@@ -298,29 +301,31 @@ describe('ValidationUtils', () => {
     test('should handle failed API calls', async () => {
       const mockApiCall = jest.fn().mockRejectedValue(new Error('API failed'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-      
+
       const result = await safeBrowserApiCall(mockApiCall, [], 'Test API');
-      
+
       expect(result.success).toBe(false);
       expect(result.data).toBeNull();
       expect(result.error).toMatchObject({
         message: expect.any(String),
         type: expect.any(String),
-        isRetryable: expect.any(Boolean)
+        isRetryable: expect.any(Boolean),
       });
-      
+
       consoleSpy.mockRestore();
     });
 
     test('should handle extension context errors specifically', async () => {
-      const mockApiCall = jest.fn().mockRejectedValue(new Error('Extension context invalidated'));
+      const mockApiCall = jest
+        .fn()
+        .mockRejectedValue(new Error('Extension context invalidated'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-      
+
       const result = await safeBrowserApiCall(mockApiCall, [], 'Test API');
-      
+
       expect(result.error.type).toBe(ERROR_TYPES.EXTENSION_CONTEXT);
       expect(result.error.isRetryable).toBe(false);
-      
+
       consoleSpy.mockRestore();
     });
   });
@@ -402,7 +407,9 @@ describe('ValidationUtils', () => {
     });
 
     test('should sanitize HTML characters', () => {
-      const result = validateNoteText('Note with <script>alert("xss")</script>');
+      const result = validateNoteText(
+        'Note with <script>alert("xss")</script>'
+      );
       expect(result.isValid).toBe(true);
       expect(result.sanitizedText).toContain('&lt;script&gt;');
       expect(result.sanitizedText).not.toContain('<script>');
@@ -435,10 +442,10 @@ describe('ValidationUtils', () => {
         new Error('Storage quota exceeded'),
         new Error('Network timeout'),
         new Error('tabs.create failed'),
-        new Error('Unknown browser error')
+        new Error('Unknown browser error'),
       ];
 
-      errors.forEach(error => {
+      errors.forEach((error) => {
         const result = categorizeError(error);
         expect(result).toHaveProperty('type');
         expect(result).toHaveProperty('userMessage');
@@ -460,11 +467,11 @@ describe('ValidationUtils', () => {
         id: `site-${i}`,
         urlPattern: `example${i}.com`,
         isEnabled: true,
-        dailyLimitSeconds: 3600
+        dailyLimitSeconds: 3600,
       }));
 
       let validCount = 0;
-      largeDataSet.forEach(site => {
+      largeDataSet.forEach((site) => {
         const result = validateSiteObject(site);
         if (result.isValid) validCount++;
       });
@@ -477,9 +484,9 @@ describe('ValidationUtils', () => {
       const longString = 'a'.repeat(10000);
       validateUrlPattern(longString);
       const end = Date.now();
-      
+
       // Should complete within reasonable time (less than 100ms)
       expect(end - start).toBeLessThan(100);
     });
   });
-}); 
+});

@@ -7,7 +7,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 // Mock the site_storage module
 const mockGetDistractingSites = jest.fn();
 jest.unstable_mockModule('../../../background_scripts/site_storage.js', () => ({
-  getDistractingSites: mockGetDistractingSites
+  getDistractingSites: mockGetDistractingSites,
 }));
 
 // Mock browser API
@@ -19,14 +19,14 @@ const mockStorageArea = {
 const mockOnChanged = {
   addListener: jest.fn(),
   removeListener: jest.fn(),
-  hasListener: jest.fn()
+  hasListener: jest.fn(),
 };
 
 global.browser = {
   storage: {
     local: mockStorageArea,
-    onChanged: mockOnChanged
-  }
+    onChanged: mockOnChanged,
+  },
 };
 
 // Declare variables for the imported functions, to be assigned in beforeEach
@@ -37,7 +37,7 @@ let loadDistractingSitesFromStorage;
 describe('DistractionDetector', () => {
   beforeEach(async () => {
     jest.resetModules(); // Reset module cache
-    
+
     // Clear all mocks
     mockGetDistractingSites.mockReset();
     mockOnChanged.addListener.mockReset();
@@ -47,10 +47,14 @@ describe('DistractionDetector', () => {
     mockStorageArea.set.mockReset();
 
     // Re-import the module to get a fresh state
-    const detectorModule = await import('../../../background_scripts/distraction_detector.js');
-    initializeDistractionDetector = detectorModule.initializeDistractionDetector;
+    const detectorModule = await import(
+      '../../../background_scripts/distraction_detector.js'
+    );
+    initializeDistractionDetector =
+      detectorModule.initializeDistractionDetector;
     checkIfUrlIsDistracting = detectorModule.checkIfUrlIsDistracting;
-    loadDistractingSitesFromStorage = detectorModule.loadDistractingSitesFromStorage;
+    loadDistractingSitesFromStorage =
+      detectorModule.loadDistractingSitesFromStorage;
   });
 
   const sampleSites = [
@@ -76,7 +80,7 @@ describe('DistractionDetector', () => {
       expect(result.isMatch).toBe(false);
       expect(result.siteId).toBeNull();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        "[DistractionDetector] Detector not initialized. Call initializeDistractionDetector first."
+        '[DistractionDetector] Detector not initialized. Call initializeDistractionDetector first.'
       );
       expect(mockGetDistractingSites).not.toHaveBeenCalled();
     });
@@ -99,58 +103,64 @@ describe('DistractionDetector', () => {
       const onSitesReloadedMock = jest.fn();
       mockGetDistractingSites.mockResolvedValue([...sampleSites]);
       await initializeDistractionDetector(onSitesReloadedMock);
-      expect(mockGetDistractingSites).toHaveBeenCalledTimes(1); 
+      expect(mockGetDistractingSites).toHaveBeenCalledTimes(1);
       expect(onSitesReloadedMock).toHaveBeenCalledTimes(1);
     });
 
     it('should warn and not reinitialize if already initialized', async () => {
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      
+      const consoleWarnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+
       // First initialization
       mockGetDistractingSites.mockResolvedValue([...sampleSites]);
       await initializeDistractionDetector();
       expect(mockGetDistractingSites).toHaveBeenCalledTimes(1);
       expect(browser.storage.onChanged.addListener).toHaveBeenCalledTimes(1);
-      
+
       // Reset mocks to track second call
       mockGetDistractingSites.mockClear();
       browser.storage.onChanged.addListener.mockClear();
-      
+
       // Second initialization attempt
       await initializeDistractionDetector();
-      
+
       // Verify warning was shown
-      expect(consoleWarnSpy).toHaveBeenCalledWith('[DistractionDetector] Already initialized.');
-      
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[DistractionDetector] Already initialized.'
+      );
+
       // Verify no repeated initialization
       expect(mockGetDistractingSites).not.toHaveBeenCalled();
       expect(browser.storage.onChanged.addListener).not.toHaveBeenCalled();
-      
+
       consoleWarnSpy.mockRestore();
     });
   });
 
   describe('loadDistractingSitesFromStorage', () => {
     it('should handle errors when loading sites from storage', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
       // Make getDistractingSites throw an error
       const testError = new Error('Test storage error');
       mockGetDistractingSites.mockRejectedValue(testError);
-      
+
       await loadDistractingSitesFromStorage();
-      
+
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[DistractionDetector] Error loading distracting sites from storage:',
         testError
       );
-      
+
       // Test that despite the error, further operations can proceed
       // Cache should be set to an empty array to prevent undefined errors
       const result = checkIfUrlIsDistracting('http://example.com');
       expect(result.isMatch).toBe(false);
-      
+
       consoleErrorSpy.mockRestore();
     });
 
@@ -158,15 +168,15 @@ describe('DistractionDetector', () => {
       // Test various invalid return values
       mockGetDistractingSites.mockResolvedValue(null);
       await loadDistractingSitesFromStorage();
-      
+
       // Should handle null by converting to empty array
       let result = checkIfUrlIsDistracting('http://example.com');
       expect(result.isMatch).toBe(false);
-      
+
       // Test with non-array value
-      mockGetDistractingSites.mockResolvedValue({notAnArray: true});
+      mockGetDistractingSites.mockResolvedValue({ notAnArray: true });
       await loadDistractingSitesFromStorage();
-      
+
       result = checkIfUrlIsDistracting('http://example.com');
       expect(result.isMatch).toBe(false);
     });
@@ -176,7 +186,7 @@ describe('DistractionDetector', () => {
     beforeEach(async () => {
       // Ensure detector is initialized for these tests
       mockGetDistractingSites.mockResolvedValue([...sampleSites]);
-      await initializeDistractionDetector(); 
+      await initializeDistractionDetector();
       mockGetDistractingSites.mockClear(); // Clear call count from init
     });
 
@@ -207,7 +217,9 @@ describe('DistractionDetector', () => {
 
     it('should handle URLs with different subdomains correctly based on hostname matching', () => {
       // Assuming 'example.com' pattern should match 'sub.example.com' due to includes logic
-      const result = checkIfUrlIsDistracting('https://sub.example.com/another/page');
+      const result = checkIfUrlIsDistracting(
+        'https://sub.example.com/another/page'
+      );
       expect(result.isMatch).toBe(true);
       expect(result.siteId).toBe('1');
     });
@@ -222,18 +234,24 @@ describe('DistractionDetector', () => {
   describe('Storage Change Handling', () => {
     it('should reload distracting sites when storage.onChanged fires for distractingSites', async () => {
       mockGetDistractingSites.mockResolvedValue([...sampleSites]);
-      await initializeDistractionDetector(); 
+      await initializeDistractionDetector();
       expect(mockGetDistractingSites).toHaveBeenCalledTimes(1); // Initial load
 
-      const newSites = [{ id: '5', urlPattern: 'newsite.com', isEnabled: true }];
+      const newSites = [
+        { id: '5', urlPattern: 'newsite.com', isEnabled: true },
+      ];
       mockGetDistractingSites.mockResolvedValue([...newSites]); // Setup for the next call
 
       // Get the registered change listener and call it
-      const changeCallback = browser.storage.onChanged.addListener.mock.calls[0][0];
-      await changeCallback({ distractingSites: { newValue: newSites } }, 'local');
+      const changeCallback =
+        browser.storage.onChanged.addListener.mock.calls[0][0];
+      await changeCallback(
+        { distractingSites: { newValue: newSites } },
+        'local'
+      );
 
       expect(mockGetDistractingSites).toHaveBeenCalledTimes(2); // Should have reloaded
-      
+
       // Verify the cache was updated by checking a URL match
       const result = checkIfUrlIsDistracting('http://newsite.com');
       expect(result.isMatch).toBe(true);
@@ -246,7 +264,8 @@ describe('DistractionDetector', () => {
       expect(mockGetDistractingSites).toHaveBeenCalledTimes(1);
 
       expect(browser.storage.onChanged.addListener).toHaveBeenCalled();
-      const changeCallback = browser.storage.onChanged.addListener.mock.calls[0][0];
+      const changeCallback =
+        browser.storage.onChanged.addListener.mock.calls[0][0];
 
       // Call with changes to other storage keys
       await changeCallback({ otherKey: { newValue: 'something' } }, 'local');
@@ -262,14 +281,20 @@ describe('DistractionDetector', () => {
       await initializeDistractionDetector(onSitesReloadedMock);
       expect(onSitesReloadedMock).toHaveBeenCalledTimes(1); // Called after initial load
 
-      const newSites = [{ id: '5', urlPattern: 'newsite.com', isEnabled: true }];
+      const newSites = [
+        { id: '5', urlPattern: 'newsite.com', isEnabled: true },
+      ];
       mockGetDistractingSites.mockResolvedValue([...newSites]);
 
-      const changeCallback = browser.storage.onChanged.addListener.mock.calls[0][0];
-      await changeCallback({ distractingSites: { newValue: newSites } }, 'local');
+      const changeCallback =
+        browser.storage.onChanged.addListener.mock.calls[0][0];
+      await changeCallback(
+        { distractingSites: { newValue: newSites } },
+        'local'
+      );
 
       expect(mockGetDistractingSites).toHaveBeenCalledTimes(2); // Initial + reload
       expect(onSitesReloadedMock).toHaveBeenCalledTimes(2); // Called again after reload
     });
   });
-}); 
+});

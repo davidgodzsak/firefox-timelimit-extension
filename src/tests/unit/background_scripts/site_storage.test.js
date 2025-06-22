@@ -1,7 +1,7 @@
 /**
  * @file site_storage.test.js
  * @description Unit tests for site storage module
- * 
+ *
  * Tests verify that:
  * - Site CRUD operations work correctly
  * - Data validation is properly enforced
@@ -9,7 +9,14 @@
  * - Storage interactions are correct
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
 // Mock browser APIs
 const mockStorageArea = {
@@ -54,7 +61,9 @@ describe('Site Storage Module', () => {
     });
 
     // Setup UUID generation
-    global.crypto.randomUUID.mockImplementation(() => `test-uuid-${++uuidCounter}`);
+    global.crypto.randomUUID.mockImplementation(
+      () => `test-uuid-${++uuidCounter}`
+    );
 
     // Setup console spy
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -80,8 +89,18 @@ describe('Site Storage Module', () => {
 
     it('should return existing sites', async () => {
       const testSites = [
-        { id: 'site1', urlPattern: 'facebook.com', dailyLimitSeconds: 3600, isEnabled: true },
-        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+        {
+          id: 'site1',
+          urlPattern: 'facebook.com',
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        },
+        {
+          id: 'site2',
+          urlPattern: 'youtube.com',
+          dailyLimitSeconds: 1800,
+          isEnabled: false,
+        },
       ];
       mockLocalStorageData.distractingSites = testSites;
 
@@ -94,7 +113,10 @@ describe('Site Storage Module', () => {
 
       const sites = await siteStorage.getDistractingSites();
       expect(sites).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error getting distracting sites:', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error getting distracting sites:',
+        expect.any(Error)
+      );
     });
   });
 
@@ -103,19 +125,21 @@ describe('Site Storage Module', () => {
       const siteData = {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(siteData);
 
       expect(result).toEqual({
         id: 'test-uuid-1',
-        ...siteData
+        ...siteData,
       });
-      expect(mockLocalStorageData.distractingSites).toEqual([{
-        id: 'test-uuid-1',
-        ...siteData
-      }]);
+      expect(mockLocalStorageData.distractingSites).toEqual([
+        {
+          id: 'test-uuid-1',
+          ...siteData,
+        },
+      ]);
     });
 
     it('should add a site with daily open limit successfully', async () => {
@@ -123,19 +147,21 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 10,
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(siteData);
 
       expect(result).toEqual({
         id: 'test-uuid-1',
-        ...siteData
+        ...siteData,
       });
-      expect(mockLocalStorageData.distractingSites).toEqual([{
-        id: 'test-uuid-1',
-        ...siteData
-      }]);
+      expect(mockLocalStorageData.distractingSites).toEqual([
+        {
+          id: 'test-uuid-1',
+          ...siteData,
+        },
+      ]);
     });
 
     it('should add a site with only open limit (no time limit)', async () => {
@@ -143,14 +169,14 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 1, // Minimum required value
         dailyOpenLimit: 5,
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(siteData);
 
       expect(result).toEqual({
         id: 'test-uuid-1',
-        ...siteData
+        ...siteData,
       });
       expect(result.dailyOpenLimit).toBe(5);
     });
@@ -158,13 +184,16 @@ describe('Site Storage Module', () => {
     it('should validate required fields', async () => {
       const invalidSiteData = {
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
         // Missing urlPattern
       };
 
       const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid siteObject provided to addDistractingSite. 'urlPattern' (string) and 'dailyLimitSeconds' (positive number) are required.", expect.any(Object));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Invalid siteObject provided to addDistractingSite. 'urlPattern' (string) and 'dailyLimitSeconds' (positive number) are required.",
+        expect.any(Object)
+      );
     });
 
     it('should validate dailyOpenLimit when provided', async () => {
@@ -172,12 +201,15 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: -5, // Invalid negative value
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", -5);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.',
+        -5
+      );
     });
 
     it('should validate dailyOpenLimit is a number when provided', async () => {
@@ -185,12 +217,15 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 'invalid', // Should be a number
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", 'invalid');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.',
+        'invalid'
+      );
     });
 
     it('should validate dailyOpenLimit is positive when provided', async () => {
@@ -198,19 +233,22 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 0, // Should be positive
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(invalidSiteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", 0);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.',
+        0
+      );
     });
 
     it('should validate urlPattern format', async () => {
       const invalidSiteData = {
         urlPattern: '', // Empty string
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(invalidSiteData);
@@ -221,7 +259,7 @@ describe('Site Storage Module', () => {
       const invalidSiteData = {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: -100, // Negative
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(invalidSiteData);
@@ -234,12 +272,15 @@ describe('Site Storage Module', () => {
       const siteData = {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
       };
 
       const result = await siteStorage.addDistractingSite(siteData);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error adding distracting site:', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error adding distracting site:',
+        expect.any(Error)
+      );
     });
 
     it('should allow duplicate URL patterns', async () => {
@@ -247,7 +288,7 @@ describe('Site Storage Module', () => {
       const siteData1 = {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
       };
       const result1 = await siteStorage.addDistractingSite(siteData1);
       expect(result1).toBeTruthy();
@@ -256,7 +297,7 @@ describe('Site Storage Module', () => {
       const siteData2 = {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 1800,
-        isEnabled: false
+        isEnabled: false,
       };
 
       const result2 = await siteStorage.addDistractingSite(siteData2);
@@ -269,15 +310,25 @@ describe('Site Storage Module', () => {
     beforeEach(async () => {
       // Setup existing sites
       mockLocalStorageData.distractingSites = [
-        { id: 'site1', urlPattern: 'facebook.com', dailyLimitSeconds: 3600, isEnabled: true },
-        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+        {
+          id: 'site1',
+          urlPattern: 'facebook.com',
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        },
+        {
+          id: 'site2',
+          urlPattern: 'youtube.com',
+          dailyLimitSeconds: 1800,
+          isEnabled: false,
+        },
       ];
     });
 
     it('should update existing site successfully', async () => {
       const updates = {
         dailyLimitSeconds: 7200,
-        isEnabled: false
+        isEnabled: false,
       };
 
       const result = await siteStorage.updateDistractingSite('site1', updates);
@@ -286,14 +337,14 @@ describe('Site Storage Module', () => {
         id: 'site1',
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 7200,
-        isEnabled: false
+        isEnabled: false,
       });
       expect(mockLocalStorageData.distractingSites[0]).toEqual(result);
     });
 
     it('should update site with dailyOpenLimit successfully', async () => {
       const updates = {
-        dailyOpenLimit: 10
+        dailyOpenLimit: 10,
       };
 
       const result = await siteStorage.updateDistractingSite('site1', updates);
@@ -303,7 +354,7 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 10,
-        isEnabled: true
+        isEnabled: true,
       });
       expect(mockLocalStorageData.distractingSites[0]).toEqual(result);
     });
@@ -311,7 +362,7 @@ describe('Site Storage Module', () => {
     it('should update both time and open limits simultaneously', async () => {
       const updates = {
         dailyLimitSeconds: 7200,
-        dailyOpenLimit: 15
+        dailyOpenLimit: 15,
       };
 
       const result = await siteStorage.updateDistractingSite('site1', updates);
@@ -321,7 +372,7 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 7200,
         dailyOpenLimit: 15,
-        isEnabled: true
+        isEnabled: true,
       });
     });
 
@@ -330,7 +381,7 @@ describe('Site Storage Module', () => {
       mockLocalStorageData.distractingSites[0].dailyOpenLimit = 5;
 
       const updates = {
-        dailyLimitSeconds: 7200
+        dailyLimitSeconds: 7200,
       };
 
       const result = await siteStorage.updateDistractingSite('site1', updates);
@@ -340,60 +391,87 @@ describe('Site Storage Module', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 7200,
         dailyOpenLimit: 5, // Should preserve existing value
-        isEnabled: true
+        isEnabled: true,
       });
     });
 
     it('should return null for non-existent site', async () => {
       const updates = { dailyLimitSeconds: 7200 };
 
-      const result = await siteStorage.updateDistractingSite('non-existent', updates);
+      const result = await siteStorage.updateDistractingSite(
+        'non-existent',
+        updates
+      );
       expect(result).toBeNull();
     });
 
     it('should validate updated fields', async () => {
       const invalidUpdates = {
-        dailyLimitSeconds: -100 // Negative
+        dailyLimitSeconds: -100, // Negative
       };
 
-      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      const result = await siteStorage.updateDistractingSite(
+        'site1',
+        invalidUpdates
+      );
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyLimitSeconds in updates for updateDistractingSite.', expect.any(Number));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyLimitSeconds in updates for updateDistractingSite.',
+        expect.any(Number)
+      );
     });
 
     it('should validate updated dailyOpenLimit', async () => {
       const invalidUpdates = {
-        dailyOpenLimit: -5 // Negative
+        dailyOpenLimit: -5, // Negative
       };
 
-      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      const result = await siteStorage.updateDistractingSite(
+        'site1',
+        invalidUpdates
+      );
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyOpenLimit in updates for updateDistractingSite.', -5);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyOpenLimit in updates for updateDistractingSite.',
+        -5
+      );
     });
 
     it('should validate dailyOpenLimit is a number', async () => {
       const invalidUpdates = {
-        dailyOpenLimit: 'invalid' // Not a number
+        dailyOpenLimit: 'invalid', // Not a number
       };
 
-      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      const result = await siteStorage.updateDistractingSite(
+        'site1',
+        invalidUpdates
+      );
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyOpenLimit in updates for updateDistractingSite.', 'invalid');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyOpenLimit in updates for updateDistractingSite.',
+        'invalid'
+      );
     });
 
     it('should validate dailyOpenLimit is positive', async () => {
       const invalidUpdates = {
-        dailyOpenLimit: 0 // Zero is not positive
+        dailyOpenLimit: 0, // Zero is not positive
       };
 
-      const result = await siteStorage.updateDistractingSite('site1', invalidUpdates);
+      const result = await siteStorage.updateDistractingSite(
+        'site1',
+        invalidUpdates
+      );
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Invalid dailyOpenLimit in updates for updateDistractingSite.', 0);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Invalid dailyOpenLimit in updates for updateDistractingSite.',
+        0
+      );
     });
 
     it('should allow updating to any URL pattern', async () => {
       const updates = {
-        urlPattern: 'youtube.com' // Even if it exists elsewhere (no duplicate checking)
+        urlPattern: 'youtube.com', // Even if it exists elsewhere (no duplicate checking)
       };
 
       const result = await siteStorage.updateDistractingSite('site1', updates);
@@ -408,7 +486,10 @@ describe('Site Storage Module', () => {
 
       const result = await siteStorage.updateDistractingSite('site1', updates);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating distracting site with ID "site1":', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error updating distracting site with ID "site1":',
+        expect.any(Error)
+      );
     });
   });
 
@@ -416,8 +497,18 @@ describe('Site Storage Module', () => {
     beforeEach(async () => {
       // Setup existing sites
       mockLocalStorageData.distractingSites = [
-        { id: 'site1', urlPattern: 'facebook.com', dailyLimitSeconds: 3600, isEnabled: true },
-        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+        {
+          id: 'site1',
+          urlPattern: 'facebook.com',
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        },
+        {
+          id: 'site2',
+          urlPattern: 'youtube.com',
+          dailyLimitSeconds: 1800,
+          isEnabled: false,
+        },
       ];
     });
 
@@ -426,7 +517,12 @@ describe('Site Storage Module', () => {
 
       expect(result).toBe(true);
       expect(mockLocalStorageData.distractingSites).toEqual([
-        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+        {
+          id: 'site2',
+          urlPattern: 'youtube.com',
+          dailyLimitSeconds: 1800,
+          isEnabled: false,
+        },
       ]);
     });
 
@@ -441,7 +537,10 @@ describe('Site Storage Module', () => {
 
       const result = await siteStorage.deleteDistractingSite('site1');
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting distracting site with ID "site1":', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error deleting distracting site with ID "site1":',
+        expect.any(Error)
+      );
     });
   });
 
@@ -459,7 +558,12 @@ describe('Site Storage Module', () => {
       // Set incomplete site objects
       mockLocalStorageData.distractingSites = [
         { id: 'site1', urlPattern: 'facebook.com' }, // Missing required fields
-        { id: 'site2', urlPattern: 'youtube.com', dailyLimitSeconds: 1800, isEnabled: false }
+        {
+          id: 'site2',
+          urlPattern: 'youtube.com',
+          dailyLimitSeconds: 1800,
+          isEnabled: false,
+        },
       ];
 
       const sites = await siteStorage.getDistractingSites();
@@ -472,13 +576,13 @@ describe('Site Storage Module', () => {
       const site1 = await siteStorage.addDistractingSite({
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
-        isEnabled: true
+        isEnabled: true,
       });
 
       const site2 = await siteStorage.addDistractingSite({
         urlPattern: 'youtube.com',
         dailyLimitSeconds: 1800,
-        isEnabled: false
+        isEnabled: false,
       });
 
       expect(site1).toBeTruthy();
@@ -486,7 +590,7 @@ describe('Site Storage Module', () => {
 
       // Update one
       const updatedSite1 = await siteStorage.updateDistractingSite(site1.id, {
-        dailyLimitSeconds: 7200
+        dailyLimitSeconds: 7200,
       });
       expect(updatedSite1.dailyLimitSeconds).toBe(7200);
 
@@ -501,4 +605,4 @@ describe('Site Storage Module', () => {
       expect(finalSites[0].dailyLimitSeconds).toBe(7200);
     });
   });
-}); 
+});

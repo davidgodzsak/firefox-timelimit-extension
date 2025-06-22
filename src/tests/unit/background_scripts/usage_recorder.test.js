@@ -6,10 +6,13 @@
 import { jest } from '@jest/globals';
 
 // Mock the usage_storage module
-jest.unstable_mockModule('../../../background_scripts/usage_storage.js', () => ({
-  getUsageStats: jest.fn(),
-  updateUsageStats: jest.fn(),
-}));
+jest.unstable_mockModule(
+  '../../../background_scripts/usage_storage.js',
+  () => ({
+    getUsageStats: jest.fn(),
+    updateUsageStats: jest.fn(),
+  })
+);
 
 // Mock browser.storage.local (used for session-like storage)
 const mockLocalStorage = {
@@ -27,15 +30,17 @@ global.browser = {
 };
 
 // Import the mocked functions
-const { getUsageStats, updateUsageStats } = await import('../../../background_scripts/usage_storage.js');
+const { getUsageStats, updateUsageStats } = await import(
+  '../../../background_scripts/usage_storage.js'
+);
 
 // Import the module under test after mocking its dependencies
-const { 
-  startTracking, 
-  stopTracking, 
-  updateUsage, 
-  getCurrentTrackingInfo, 
-  recordSiteOpen 
+const {
+  startTracking,
+  stopTracking,
+  updateUsage,
+  getCurrentTrackingInfo,
+  recordSiteOpen,
 } = await import('../../../background_scripts/usage_recorder.js');
 
 describe('UsageRecorder (Event-Driven)', () => {
@@ -45,7 +50,7 @@ describe('UsageRecorder (Event-Driven)', () => {
     // Reset all mocks
     jest.clearAllMocks();
     mockLocalStorage.data = {};
-    
+
     // Set up time mocking
     currentTime = 1620000000000; // Fixed timestamp for tests
     global.Date.now = jest.fn(() => currentTime);
@@ -58,7 +63,7 @@ describe('UsageRecorder (Event-Driven)', () => {
     mockLocalStorage.get.mockImplementation((keys) => {
       const result = {};
       const keysArray = Array.isArray(keys) ? keys : [keys];
-      keysArray.forEach(key => {
+      keysArray.forEach((key) => {
         if (mockLocalStorage.data[key] !== undefined) {
           result[key] = mockLocalStorage.data[key];
         }
@@ -73,7 +78,7 @@ describe('UsageRecorder (Event-Driven)', () => {
 
     mockLocalStorage.remove.mockImplementation((keys) => {
       const keysArray = Array.isArray(keys) ? keys : [keys];
-      keysArray.forEach(key => {
+      keysArray.forEach((key) => {
         delete mockLocalStorage.data[key];
       });
       return Promise.resolve();
@@ -88,7 +93,7 @@ describe('UsageRecorder (Event-Driven)', () => {
   describe('startTracking', () => {
     it('should start tracking for a new site and tab', async () => {
       const result = await startTracking(123, 'site1');
-      
+
       expect(result).toBe(true);
       expect(mockLocalStorage.set).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -98,7 +103,7 @@ describe('UsageRecorder (Event-Driven)', () => {
           session_tracking_isActive: true,
         })
       );
-      
+
       // Should record the site open event
       expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
@@ -124,7 +129,7 @@ describe('UsageRecorder (Event-Driven)', () => {
       const result = await startTracking(789, 'newSite');
 
       expect(result).toBe(true);
-      
+
       // Should have recorded time for the old site
       expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
@@ -134,7 +139,7 @@ describe('UsageRecorder (Event-Driven)', () => {
           opens: 0,
         })
       );
-      
+
       // Should have started tracking the new site
       expect(updateUsageStats).toHaveBeenCalledWith(
         expect.any(String),
@@ -220,7 +225,7 @@ describe('UsageRecorder (Event-Driven)', () => {
         session_tracking_tabId: 123,
         session_tracking_isActive: true,
       };
-      
+
       mockLocalStorage.get.mockRejectedValue(new Error('Storage error'));
 
       const totalTime = await stopTracking();
@@ -252,7 +257,7 @@ describe('UsageRecorder (Event-Driven)', () => {
           opens: 0,
         })
       );
-      
+
       // Should reset start time
       expect(mockLocalStorage.set).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -372,14 +377,20 @@ describe('UsageRecorder (Event-Driven)', () => {
           if (args.length === 0) {
             return mockDate;
           }
-          return new (Function.prototype.bind.apply(Date, [null, ...args]));
+          return new (Function.prototype.bind.apply(Date, [null, ...args]))();
         }
         static now() {
           return mockDate.getTime();
         }
-        getFullYear() { return mockDate.getFullYear(); }
-        getMonth() { return mockDate.getMonth(); }
-        getDate() { return mockDate.getDate(); }
+        getFullYear() {
+          return mockDate.getFullYear();
+        }
+        getMonth() {
+          return mockDate.getMonth();
+        }
+        getDate() {
+          return mockDate.getDate();
+        }
       };
 
       await recordSiteOpen('site1');
@@ -391,4 +402,4 @@ describe('UsageRecorder (Event-Driven)', () => {
       );
     });
   });
-}); 
+});

@@ -1,7 +1,7 @@
 /**
  * @file popup_background_interaction.test.js
  * @description Integration tests for Popup UI <-> Background Script communication
- * 
+ *
  * Tests verify that:
  * - Popup can get current page limit information
  * - Popup can add new limits for sites
@@ -10,7 +10,14 @@
  * - Settings navigation works correctly
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
 // Mock browser APIs before importing modules
 const mockStorageArea = {
@@ -54,7 +61,7 @@ describe('Popup UI <-> Background Integration', () => {
   let consoleLogSpy;
   let uuidCounter;
   let mockDistractionDetector;
-  
+
   // Storage modules
   let siteStorage;
 
@@ -73,7 +80,7 @@ describe('Popup UI <-> Background Integration', () => {
         return Promise.resolve(result);
       } else if (Array.isArray(key)) {
         const result = {};
-        key.forEach(k => {
+        key.forEach((k) => {
           if (mockLocalStorageData[k] !== undefined) {
             result[k] = mockLocalStorageData[k];
           }
@@ -89,23 +96,30 @@ describe('Popup UI <-> Background Integration', () => {
     });
 
     // Setup UUID generation
-    global.crypto.randomUUID.mockImplementation(() => `test-uuid-${++uuidCounter}`);
+    global.crypto.randomUUID.mockImplementation(
+      () => `test-uuid-${++uuidCounter}`
+    );
 
     // Setup console spies
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
     // Setup tab query mock
-    mockTabsArea.query.mockResolvedValue([{
-      id: 123,
-      url: 'https://facebook.com',
-      active: true,
-      windowId: 1
-    }]);
+    mockTabsArea.query.mockResolvedValue([
+      {
+        id: 123,
+        url: 'https://facebook.com',
+        active: true,
+        windowId: 1,
+      },
+    ]);
 
     // Create mock distraction detector
     mockDistractionDetector = {
-      checkIfUrlIsDistracting: jest.fn(() => ({ isMatch: false, siteId: null }))
+      checkIfUrlIsDistracting: jest.fn(() => ({
+        isMatch: false,
+        siteId: null,
+      })),
     };
 
     // Clear all mocks before setup
@@ -117,21 +131,28 @@ describe('Popup UI <-> Background Integration', () => {
 
     // Create a message handler that mimics main.js popup functionality
     messageHandler = async (message) => {
-      console.log('[MessageHandler] Received message:', message.action, message.payload);
-      
+      console.log(
+        '[MessageHandler] Received message:',
+        message.action,
+        message.payload
+      );
+
       try {
         switch (message.action) {
           // === Popup API ===
           case 'getCurrentPageLimitInfo': {
             // Get current active tab
-            const tabs = await mockTabsArea.query({ active: true, currentWindow: true });
+            const tabs = await mockTabsArea.query({
+              active: true,
+              currentWindow: true,
+            });
             if (!tabs.length) {
               throw new Error('No active tab found');
             }
-            
+
             const currentTab = tabs[0];
             const url = currentTab.url;
-            
+
             // Extract hostname
             let hostname;
             try {
@@ -139,60 +160,59 @@ describe('Popup UI <-> Background Integration', () => {
             } catch {
               hostname = url;
             }
-            
+
             // Check if it's a distracting site
-            const distractionCheck = mockDistractionDetector.checkIfUrlIsDistracting(url);
+            const distractionCheck =
+              mockDistractionDetector.checkIfUrlIsDistracting(url);
             const { isMatch, siteId } = distractionCheck;
-            
+
             let siteInfo = null;
             if (isMatch && siteId) {
               const sites = await siteStorage.getDistractingSites();
-              siteInfo = sites.find(s => s.id === siteId);
+              siteInfo = sites.find((s) => s.id === siteId);
             }
-            
-            return { 
-              success: true, 
-              data: { 
+
+            return {
+              success: true,
+              data: {
                 url,
                 hostname,
                 isDistractingSite: isMatch,
-                siteInfo: siteInfo
-              } 
+                siteInfo: siteInfo,
+              },
             };
           }
-          
+
           case 'addQuickLimit': {
             if (!message.payload) {
               throw new Error('Payload required for addQuickLimit');
             }
-            
+
             const { urlPattern, timeLimit, openLimit } = message.payload;
-            
+
             // Build site object
             const siteData = {
               urlPattern: urlPattern,
               dailyLimitSeconds: timeLimit || 3600, // Default to 1 hour
-              isEnabled: true
+              isEnabled: true,
             };
-            
+
             // Add open limit if provided
             if (openLimit && openLimit > 0) {
               siteData.dailyOpenLimit = openLimit;
             }
-            
+
             const newSite = await siteStorage.addDistractingSite(siteData);
             if (newSite === null) {
               throw new Error('Failed to add site - validation failed');
             }
-            
-            return { 
-              success: true, 
-              data: newSite 
+
+            return {
+              success: true,
+              data: newSite,
             };
           }
-          
 
-          
           default:
             throw new Error(`Unknown action: ${message.action}`);
         }
@@ -201,8 +221,8 @@ describe('Popup UI <-> Background Integration', () => {
         return {
           success: false,
           error: {
-            message: error.message
-          }
+            message: error.message,
+          },
         };
       }
     };
@@ -215,10 +235,13 @@ describe('Popup UI <-> Background Integration', () => {
 
   describe('getCurrentPageLimitInfo', () => {
     it('should return page info for non-distracting site', async () => {
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: false, siteId: null });
-      
+      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
+        isMatch: false,
+        siteId: null,
+      });
+
       const response = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
 
       expect(response.success).toBe(true);
@@ -226,7 +249,7 @@ describe('Popup UI <-> Background Integration', () => {
         url: 'https://facebook.com',
         hostname: 'facebook.com',
         isDistractingSite: false,
-        siteInfo: null
+        siteInfo: null,
       });
     });
 
@@ -237,15 +260,18 @@ describe('Popup UI <-> Background Integration', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 10,
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [existingSite];
-      
+
       // Mock distraction detector to return a match
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: true, siteId: 'site1' });
-      
+      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
+        isMatch: true,
+        siteId: 'site1',
+      });
+
       const response = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
 
       expect(response.success).toBe(true);
@@ -253,15 +279,15 @@ describe('Popup UI <-> Background Integration', () => {
         url: 'https://facebook.com',
         hostname: 'facebook.com',
         isDistractingSite: true,
-        siteInfo: existingSite
+        siteInfo: existingSite,
       });
     });
 
     it('should handle no active tab gracefully', async () => {
       mockTabsArea.query.mockResolvedValue([]);
-      
+
       const response = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
 
       expect(response.success).toBe(false);
@@ -269,15 +295,17 @@ describe('Popup UI <-> Background Integration', () => {
     });
 
     it('should handle invalid URLs gracefully', async () => {
-      mockTabsArea.query.mockResolvedValue([{
-        id: 123,
-        url: 'invalid-url',
-        active: true,
-        windowId: 1
-      }]);
-      
+      mockTabsArea.query.mockResolvedValue([
+        {
+          id: 123,
+          url: 'invalid-url',
+          active: true,
+          windowId: 1,
+        },
+      ]);
+
       const response = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
 
       expect(response.success).toBe(true);
@@ -286,15 +314,20 @@ describe('Popup UI <-> Background Integration', () => {
 
     it('should handle storage errors gracefully', async () => {
       // Mock browser tabs to return a valid tab
-      mockTabsArea.query.mockResolvedValue([{
-        id: 123,
-        url: 'https://facebook.com',
-        active: true,
-        windowId: 1
-      }]);
+      mockTabsArea.query.mockResolvedValue([
+        {
+          id: 123,
+          url: 'https://facebook.com',
+          active: true,
+          windowId: 1,
+        },
+      ]);
 
       // Mock distraction detector to return a match
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: true, siteId: 'site1' });
+      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
+        isMatch: true,
+        siteId: 'site1',
+      });
 
       // Mock siteStorage.getDistractingSites to throw an error
       const originalGet = mockStorageArea.get;
@@ -304,9 +337,9 @@ describe('Popup UI <-> Background Integration', () => {
         }
         return originalGet(key);
       });
-      
+
       const response = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
 
       // The storage module handles errors gracefully by returning empty arrays
@@ -314,10 +347,13 @@ describe('Popup UI <-> Background Integration', () => {
       expect(response.success).toBe(true);
       expect(response.data.isDistractingSite).toBe(true);
       expect(response.data.siteInfo).toBe(undefined); // No site found in empty array due to storage error
-      
+
       // Storage error should be logged at the module level
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error getting distracting sites:', expect.any(Error));
-      
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error getting distracting sites:',
+        expect.any(Error)
+      );
+
       // Restore the original mock
       mockStorageArea.get.mockImplementation(originalGet);
     });
@@ -330,7 +366,7 @@ describe('Popup UI <-> Background Integration', () => {
         payload: {
           urlPattern: 'facebook.com',
           timeLimit: 1800, // 30 minutes
-        }
+        },
       });
 
       expect(response.success).toBe(true);
@@ -338,9 +374,9 @@ describe('Popup UI <-> Background Integration', () => {
         id: 'test-uuid-1',
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 1800,
-        isEnabled: true
+        isEnabled: true,
       });
-      
+
       // Verify it was stored
       expect(mockLocalStorageData.distractingSites).toEqual([response.data]);
     });
@@ -351,8 +387,8 @@ describe('Popup UI <-> Background Integration', () => {
         payload: {
           urlPattern: 'youtube.com',
           timeLimit: 3600,
-          openLimit: 5
-        }
+          openLimit: 5,
+        },
       });
 
       expect(response.success).toBe(true);
@@ -361,7 +397,7 @@ describe('Popup UI <-> Background Integration', () => {
         urlPattern: 'youtube.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 5,
-        isEnabled: true
+        isEnabled: true,
       });
     });
 
@@ -370,8 +406,8 @@ describe('Popup UI <-> Background Integration', () => {
         action: 'addQuickLimit',
         payload: {
           urlPattern: 'twitter.com',
-          openLimit: 3
-        }
+          openLimit: 3,
+        },
       });
 
       expect(response.success).toBe(true);
@@ -380,13 +416,13 @@ describe('Popup UI <-> Background Integration', () => {
         urlPattern: 'twitter.com',
         dailyLimitSeconds: 3600, // Default value
         dailyOpenLimit: 3,
-        isEnabled: true
+        isEnabled: true,
       });
     });
 
     it('should handle missing payload', async () => {
       const response = await messageHandler({
-        action: 'addQuickLimit'
+        action: 'addQuickLimit',
       });
 
       expect(response.success).toBe(false);
@@ -398,21 +434,21 @@ describe('Popup UI <-> Background Integration', () => {
         action: 'addQuickLimit',
         payload: {
           urlPattern: '', // Invalid empty pattern
-          timeLimit: 1800
-        }
+          timeLimit: 1800,
+        },
       });
 
       expect(response.success).toBe(false);
-      expect(response.error.message).toBe('Failed to add site - validation failed');
+      expect(response.error.message).toBe(
+        'Failed to add site - validation failed'
+      );
     });
   });
-
-
 
   describe('error handling', () => {
     it('should handle unknown actions', async () => {
       const response = await messageHandler({
-        action: 'unknownAction'
+        action: 'unknownAction',
       });
 
       expect(response.success).toBe(false);
@@ -424,33 +460,36 @@ describe('Popup UI <-> Background Integration', () => {
     it('should support complete add-limit workflow', async () => {
       // 1. Get page info (no existing limit)
       const pageInfoResponse = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
-      
+
       expect(pageInfoResponse.success).toBe(true);
       expect(pageInfoResponse.data.isDistractingSite).toBe(false);
-      
+
       // 2. Add a quick limit
       const addLimitResponse = await messageHandler({
         action: 'addQuickLimit',
         payload: {
           urlPattern: pageInfoResponse.data.hostname,
           timeLimit: 3600,
-          openLimit: 5
-        }
+          openLimit: 5,
+        },
       });
-      
+
       expect(addLimitResponse.success).toBe(true);
       const newSite = addLimitResponse.data;
-      
+
       // 3. Mock that the site is now detected as distracting
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: true, siteId: newSite.id });
-      
+      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
+        isMatch: true,
+        siteId: newSite.id,
+      });
+
       // 4. Get page info again (should show existing limit)
       const updatedPageInfoResponse = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
-      
+
       expect(updatedPageInfoResponse.success).toBe(true);
       expect(updatedPageInfoResponse.data.isDistractingSite).toBe(true);
       expect(updatedPageInfoResponse.data.siteInfo).toEqual(newSite);
@@ -463,26 +502,29 @@ describe('Popup UI <-> Background Integration', () => {
         urlPattern: 'facebook.com',
         dailyLimitSeconds: 3600,
         dailyOpenLimit: 5,
-        isEnabled: true
+        isEnabled: true,
       };
       mockLocalStorageData.distractingSites = [existingSite];
-      
+
       // Mock distraction detector
-      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: true, siteId: 'site1' });
-      
+      mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
+        isMatch: true,
+        siteId: 'site1',
+      });
+
       // Get page info (existing limit)
       const pageInfoResponse = await messageHandler({
-        action: 'getCurrentPageLimitInfo'
+        action: 'getCurrentPageLimitInfo',
       });
-      
+
       expect(pageInfoResponse.success).toBe(true);
       expect(pageInfoResponse.data.isDistractingSite).toBe(true);
       expect(pageInfoResponse.data.siteInfo).toEqual(existingSite);
-      
+
       // Verify the site info includes all necessary data for display
       expect(pageInfoResponse.data.siteInfo.dailyLimitSeconds).toBe(3600);
       expect(pageInfoResponse.data.siteInfo.dailyOpenLimit).toBe(5);
       expect(pageInfoResponse.data.siteInfo.urlPattern).toBe('facebook.com');
     });
   });
-}); 
+});

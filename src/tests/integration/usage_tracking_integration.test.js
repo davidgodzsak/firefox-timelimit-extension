@@ -51,23 +51,24 @@ const mockBrowser = {
 global.browser = mockBrowser;
 
 // Import the modules after setting up mocks
-const { getUsageStats, updateUsageStats } = await import('../../background_scripts/usage_storage.js');
-const { getDistractingSites } = await import('../../background_scripts/site_storage.js');
-const { updateBadge } = await import('../../background_scripts/badge_manager.js');
+const { getUsageStats, updateUsageStats } = await import(
+  '../../background_scripts/usage_storage.js'
+);
+const { getDistractingSites } = await import(
+  '../../background_scripts/site_storage.js'
+);
+const { updateBadge } = await import(
+  '../../background_scripts/badge_manager.js'
+);
 
 // Import usage recorder functions
-const {
-  startTracking,
-  stopTracking,
-  updateUsage,
-  getCurrentTrackingInfo,
-} = await import('../../background_scripts/usage_recorder.js');
+const { startTracking, stopTracking, updateUsage, getCurrentTrackingInfo } =
+  await import('../../background_scripts/usage_recorder.js');
 
 // Import distraction detector functions
-const {
-  checkIfUrlIsDistracting,
-  initializeDistractionDetector,
-} = await import('../../background_scripts/distraction_detector.js');
+const { checkIfUrlIsDistracting, initializeDistractionDetector } = await import(
+  '../../background_scripts/distraction_detector.js'
+);
 
 describe('Usage Tracking Integration', () => {
   let currentTime;
@@ -85,7 +86,7 @@ describe('Usage Tracking Integration', () => {
     mockBrowser.storage.local.get.mockImplementation((keys) => {
       const result = {};
       const keysArray = Array.isArray(keys) ? keys : [keys];
-      keysArray.forEach(key => {
+      keysArray.forEach((key) => {
         if (mockBrowser.storage.local.data[key] !== undefined) {
           result[key] = mockBrowser.storage.local.data[key];
         }
@@ -100,7 +101,7 @@ describe('Usage Tracking Integration', () => {
 
     mockBrowser.storage.local.remove.mockImplementation((keys) => {
       const keysArray = Array.isArray(keys) ? keys : [keys];
-      keysArray.forEach(key => {
+      keysArray.forEach((key) => {
         delete mockBrowser.storage.local.data[key];
       });
       return Promise.resolve();
@@ -115,7 +116,7 @@ describe('Usage Tracking Integration', () => {
     getUsageStats.mockResolvedValue({});
     updateUsageStats.mockResolvedValue(true);
     updateBadge.mockResolvedValue();
-    
+
     // Mock distracting sites
     getDistractingSites.mockResolvedValue([
       {
@@ -170,7 +171,7 @@ describe('Usage Tracking Integration', () => {
     it('should stop tracking when navigating away from distracting site', async () => {
       // Start tracking first
       await startTracking(123, 'site1');
-      
+
       // Advance time
       currentTime += 5000;
 
@@ -230,7 +231,7 @@ describe('Usage Tracking Integration', () => {
     it('should update usage when alarm fires', async () => {
       // Start tracking
       await startTracking(123, 'site1');
-      
+
       // Advance time to simulate alarm interval
       currentTime += 60000; // 1 minute
 
@@ -265,14 +266,16 @@ describe('Usage Tracking Integration', () => {
 
       // Should have 3 usage updates plus initial site open
       expect(updateUsageStats).toHaveBeenCalledTimes(4);
-      
+
       // Each update should be for 60 seconds
       const calls = updateUsageStats.mock.calls.slice(1); // Skip the initial open call
-      calls.forEach(call => {
-        expect(call[2]).toEqual(expect.objectContaining({
-          timeSpentSeconds: 60,
-          opens: 0,
-        }));
+      calls.forEach((call) => {
+        expect(call[2]).toEqual(
+          expect.objectContaining({
+            timeSpentSeconds: 60,
+            opens: 0,
+          })
+        );
       });
     });
   });
@@ -286,7 +289,7 @@ describe('Usage Tracking Integration', () => {
         'https://music.youtube.com/',
       ];
 
-      youtubeUrls.forEach(url => {
+      youtubeUrls.forEach((url) => {
         const result = checkIfUrlIsDistracting(url);
         expect(result.isMatch).toBe(true);
         expect(result.siteId).toBe('site1');
@@ -301,7 +304,7 @@ describe('Usage Tracking Integration', () => {
         'chrome://newtab/',
       ];
 
-      nonDistractingUrls.forEach(url => {
+      nonDistractingUrls.forEach((url) => {
         const result = checkIfUrlIsDistracting(url);
         expect(result.isMatch).toBe(false);
         expect(result.siteId).toBeNull();
@@ -313,7 +316,7 @@ describe('Usage Tracking Integration', () => {
     it('should integrate with badge manager during tracking', async () => {
       // Mock dynamic import for badge manager
       const mockBadgeModule = { updateBadge: jest.fn().mockResolvedValue() };
-      
+
       // This simulates the dynamic import in background.js
       const originalImport = global.import;
       global.import = jest.fn().mockResolvedValue(mockBadgeModule);
@@ -340,7 +343,9 @@ describe('Usage Tracking Integration', () => {
   describe('Error Scenarios', () => {
     it('should handle storage errors gracefully', async () => {
       // Mock storage error
-      mockBrowser.storage.local.set.mockRejectedValue(new Error('Storage error'));
+      mockBrowser.storage.local.set.mockRejectedValue(
+        new Error('Storage error')
+      );
 
       const success = await startTracking(123, 'site1');
       expect(success).toBe(false);
@@ -404,4 +409,4 @@ describe('Usage Tracking Integration', () => {
       expect(updatedInfo.siteId).toBe('site1');
     });
   });
-}); 
+});

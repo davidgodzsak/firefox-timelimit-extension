@@ -19,7 +19,10 @@ let _onSitesReloadedCallback = null; // Callback for when sites are reloaded
  */
 function _getHostnameFromUrl(urlString) {
   try {
-    if (!urlString || (!urlString.startsWith('http:') && !urlString.startsWith('https:'))) {
+    if (
+      !urlString ||
+      (!urlString.startsWith('http:') && !urlString.startsWith('https:'))
+    ) {
       return null;
     }
     const url = new URL(urlString);
@@ -39,12 +42,18 @@ export async function loadDistractingSitesFromStorage() {
   try {
     const sites = await getDistractingSites();
     _distractingSitesCache = sites && Array.isArray(sites) ? sites : [];
-    console.log('[DistractionDetector] Distracting sites cache reloaded:', _distractingSitesCache);
+    console.log(
+      '[DistractionDetector] Distracting sites cache reloaded:',
+      _distractingSitesCache
+    );
     if (_onSitesReloadedCallback) {
       _onSitesReloadedCallback();
     }
   } catch (error) {
-    console.error('[DistractionDetector] Error loading distracting sites from storage:', error);
+    console.error(
+      '[DistractionDetector] Error loading distracting sites from storage:',
+      error
+    );
     _distractingSitesCache = []; // Ensure cache is an array even on error
   }
 }
@@ -57,7 +66,9 @@ export async function loadDistractingSitesFromStorage() {
  */
 async function _handleStorageChange(changes, areaName) {
   if (areaName === 'local' && changes.distractingSites) {
-    console.log('[DistractionDetector] Detected change in distractingSites in storage. Reloading cache...');
+    console.log(
+      '[DistractionDetector] Detected change in distractingSites in storage. Reloading cache...'
+    );
     await loadDistractingSitesFromStorage();
   }
 }
@@ -86,12 +97,14 @@ export async function initializeDistractionDetector(onSitesReloaded) {
 /**
  * Checks if the given URL matches any of the cached distracting sites based on hostname.
  * @param {string} url - The URL to check.
- * @returns {{isMatch: boolean, siteId: string|null, matchingPattern: string|null}} 
+ * @returns {{isMatch: boolean, siteId: string|null, matchingPattern: string|null}}
  *           Object indicating if it's a match, the ID of the matched site, and the pattern that matched.
  */
 export function checkIfUrlIsDistracting(url) {
   if (!_isInitialized) {
-    console.warn('[DistractionDetector] Detector not initialized. Call initializeDistractionDetector first.');
+    console.warn(
+      '[DistractionDetector] Detector not initialized. Call initializeDistractionDetector first.'
+    );
     return { isMatch: false, siteId: null, matchingPattern: null };
   }
   const currentHostname = _getHostnameFromUrl(url);
@@ -104,12 +117,19 @@ export function checkIfUrlIsDistracting(url) {
     if (site.urlPattern && typeof site.urlPattern === 'string') {
       // The pattern should be a substring of the hostname, not the other way around
       // This allows 'example.com' to match both 'example.com' and 'sub.example.com'
-      if (currentHostname.includes(site.urlPattern) && site.isEnabled !== false) {
-        return { isMatch: true, siteId: site.id, matchingPattern: site.urlPattern };
+      if (
+        currentHostname.includes(site.urlPattern) &&
+        site.isEnabled !== false
+      ) {
+        return {
+          isMatch: true,
+          siteId: site.id,
+          matchingPattern: site.urlPattern,
+        };
       }
     }
   }
   return { isMatch: false, siteId: null, matchingPattern: null };
 }
 
-// Assume initializeDistractionDetector will be called by time_tracker.js orchestrator. 
+// Assume initializeDistractionDetector will be called by time_tracker.js orchestrator.

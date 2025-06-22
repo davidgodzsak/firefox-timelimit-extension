@@ -13,10 +13,10 @@
  */
 export async function getTimeoutNotes() {
   try {
-    const result = await browser.storage.local.get("timeoutNotes");
+    const result = await browser.storage.local.get('timeoutNotes');
     return result.timeoutNotes || [];
   } catch (error) {
-    console.error("Error getting timeout notes:", error);
+    console.error('Error getting timeout notes:', error);
     return [];
   }
 }
@@ -33,25 +33,32 @@ export async function getTimeoutNotes() {
  *                                 or null if validation fails or a storage error occurs.
  */
 export async function addTimeoutNote(noteObject) {
-    if (!noteObject || typeof noteObject.text !== 'string' || noteObject.text.trim() === '') {
-        console.error("Invalid noteObject provided to addTimeoutNote. 'text' (non-empty string) is required.", noteObject);
-        return null;
-    }
+  if (
+    !noteObject ||
+    typeof noteObject.text !== 'string' ||
+    noteObject.text.trim() === ''
+  ) {
+    console.error(
+      "Invalid noteObject provided to addTimeoutNote. 'text' (non-empty string) is required.",
+      noteObject
+    );
+    return null;
+  }
 
-    const newNote = {
-        id: crypto.randomUUID(),
-        text: noteObject.text.trim(),
-    };
+  const newNote = {
+    id: crypto.randomUUID(),
+    text: noteObject.text.trim(),
+  };
 
-    try {
-        const notes = await getTimeoutNotes();
-        notes.push(newNote);
-        await browser.storage.local.set({ timeoutNotes: notes });
-        return newNote;
-    } catch (error) {
-        console.error("Error adding timeout note:", error);
-        return null;
-    }
+  try {
+    const notes = await getTimeoutNotes();
+    notes.push(newNote);
+    await browser.storage.local.set({ timeoutNotes: notes });
+    return newNote;
+  } catch (error) {
+    console.error('Error adding timeout note:', error);
+    return null;
+  }
 }
 
 /**
@@ -66,37 +73,50 @@ export async function addTimeoutNote(noteObject) {
  *                                 or null if the note is not found, validation fails, or a storage error occurs.
  */
 export async function updateTimeoutNote(noteId, updates) {
-    if (!noteId || typeof noteId !== 'string') {
-        console.error("Invalid noteId provided to updateTimeoutNote.");
-        return null;
-    }
-    if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-        console.error("Invalid updates object provided to updateTimeoutNote.", updates);
-        return null;
-    }
-    if (Object.prototype.hasOwnProperty.call(updates, 'text') && (typeof updates.text !== 'string' || updates.text.trim() === '')) {
-        console.error("Invalid text in updates for updateTimeoutNote.", updates.text);
-        return null;
+  if (!noteId || typeof noteId !== 'string') {
+    console.error('Invalid noteId provided to updateTimeoutNote.');
+    return null;
+  }
+  if (
+    !updates ||
+    typeof updates !== 'object' ||
+    Object.keys(updates).length === 0
+  ) {
+    console.error(
+      'Invalid updates object provided to updateTimeoutNote.',
+      updates
+    );
+    return null;
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(updates, 'text') &&
+    (typeof updates.text !== 'string' || updates.text.trim() === '')
+  ) {
+    console.error(
+      'Invalid text in updates for updateTimeoutNote.',
+      updates.text
+    );
+    return null;
+  }
+
+  try {
+    const notes = await getTimeoutNotes();
+    const noteIndex = notes.findIndex((note) => note.id === noteId);
+
+    if (noteIndex === -1) {
+      console.warn(`Note with ID "${noteId}" not found for update.`);
+      return null;
     }
 
-    try {
-        const notes = await getTimeoutNotes();
-        const noteIndex = notes.findIndex(note => note.id === noteId);
+    const updatedNote = { ...notes[noteIndex], ...updates };
+    notes[noteIndex] = updatedNote;
 
-        if (noteIndex === -1) {
-            console.warn(`Note with ID "${noteId}" not found for update.`);
-            return null;
-        }
-
-        const updatedNote = { ...notes[noteIndex], ...updates };
-        notes[noteIndex] = updatedNote;
-
-        await browser.storage.local.set({ timeoutNotes: notes });
-        return updatedNote;
-    } catch (error) {
-        console.error(`Error updating timeout note with ID "${noteId}":`, error);
-        return null;
-    }
+    await browser.storage.local.set({ timeoutNotes: notes });
+    return updatedNote;
+  } catch (error) {
+    console.error(`Error updating timeout note with ID "${noteId}":`, error);
+    return null;
+  }
 }
 
 /**
@@ -109,24 +129,24 @@ export async function updateTimeoutNote(noteId, updates) {
  *                             false if the note was not found or a storage error occurred.
  */
 export async function deleteTimeoutNote(noteId) {
-    if (!noteId || typeof noteId !== 'string') {
-        console.error("Invalid noteId provided to deleteTimeoutNote.");
-        return false;
-    }
-    try {
-        let notes = await getTimeoutNotes();
-        const initialLength = notes.length;
-        notes = notes.filter(note => note.id !== noteId);
+  if (!noteId || typeof noteId !== 'string') {
+    console.error('Invalid noteId provided to deleteTimeoutNote.');
+    return false;
+  }
+  try {
+    let notes = await getTimeoutNotes();
+    const initialLength = notes.length;
+    notes = notes.filter((note) => note.id !== noteId);
 
-        if (notes.length === initialLength) {
-            console.warn(`Note with ID "${noteId}" not found for deletion.`);
-            return false;
-        }
-
-        await browser.storage.local.set({ timeoutNotes: notes });
-        return true;
-    } catch (error) {
-        console.error(`Error deleting timeout note with ID "${noteId}":`, error);
-        return false;
+    if (notes.length === initialLength) {
+      console.warn(`Note with ID "${noteId}" not found for deletion.`);
+      return false;
     }
-} 
+
+    await browser.storage.local.set({ timeoutNotes: notes });
+    return true;
+  } catch (error) {
+    console.error(`Error deleting timeout note with ID "${noteId}":`, error);
+    return false;
+  }
+}

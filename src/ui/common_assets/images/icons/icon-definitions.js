@@ -165,7 +165,7 @@ export const ICONS = {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 12a9 9 0 11-6.219-8.56"/>
     </svg>
-  `
+  `,
 };
 
 /**
@@ -180,11 +180,13 @@ export function getIcon(iconName, size = null) {
     console.warn(`Icon "${iconName}" not found`);
     return ICONS.INFO; // fallback
   }
-  
+
   if (size) {
-    return icon.replace(/width="\d+"/, `width="${size}"`).replace(/height="\d+"/, `height="${size}"`);
+    return icon
+      .replace(/width="\d+"/, `width="${size}"`)
+      .replace(/height="\d+"/, `height="${size}"`);
   }
-  
+
   return icon;
 }
 
@@ -199,14 +201,14 @@ export function createIconElement(iconName, options = {}) {
   const div = document.createElement('div');
   div.innerHTML = getIcon(iconName, size);
   const svg = div.firstElementChild;
-  
+
   if (className) {
     svg.classList.add(...className.split(' '));
   }
-  
+
   if (title) {
     svg.setAttribute('title', title);
   }
-  
+
   return svg;
-} 
+}

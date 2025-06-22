@@ -10,43 +10,46 @@ import { jest } from '@jest/globals';
 const mockDistractionDetector = {
   checkIfUrlIsDistracting: jest.fn(() => ({ isMatch: false, siteId: null })),
   initializeDistractionDetector: jest.fn(() => Promise.resolve()),
-  loadDistractingSitesFromStorage: jest.fn(() => Promise.resolve())
+  loadDistractingSitesFromStorage: jest.fn(() => Promise.resolve()),
 };
 
 // Mock the distraction detector module BEFORE importing other modules
-jest.unstable_mockModule('../../background_scripts/distraction_detector.js', () => mockDistractionDetector);
+jest.unstable_mockModule(
+  '../../background_scripts/distraction_detector.js',
+  () => mockDistractionDetector
+);
 
 // Mock browser APIs
 global.browser = {
   runtime: {
     sendMessage: jest.fn(),
     onMessage: {
-      addListener: jest.fn()
-    }
+      addListener: jest.fn(),
+    },
   },
   action: {
     setBadgeText: jest.fn(),
-    setBadgeBackgroundColor: jest.fn()
+    setBadgeBackgroundColor: jest.fn(),
   },
   tabs: {
     query: jest.fn(),
     get: jest.fn(),
     onActivated: {
-      addListener: jest.fn()
+      addListener: jest.fn(),
     },
     onUpdated: {
-      addListener: jest.fn()
-    }
+      addListener: jest.fn(),
+    },
   },
   storage: {
     local: {
       get: jest.fn(),
-      set: jest.fn()
+      set: jest.fn(),
     },
     onChanged: {
-      addListener: jest.fn()
-    }
-  }
+      addListener: jest.fn(),
+    },
+  },
 };
 
 describe('Performance and Error Handling Integration', () => {
@@ -59,13 +62,16 @@ describe('Performance and Error Handling Integration', () => {
 
     // Reset distraction detector mock
     mockDistractionDetector.checkIfUrlIsDistracting.mockReset();
-    mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({ isMatch: false, siteId: null });
+    mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
+      isMatch: false,
+      siteId: null,
+    });
 
     // Setup default storage mocks
     global.browser.storage.local.get.mockImplementation(async (key) => {
       const result = {};
       if (Array.isArray(key)) {
-        key.forEach(k => {
+        key.forEach((k) => {
           if (mockLocalStorage[k] !== undefined) {
             result[k] = mockLocalStorage[k];
           }
@@ -90,17 +96,19 @@ describe('Performance and Error Handling Integration', () => {
   describe('Error Recovery and Resilience', () => {
     test('should handle extension context invalidation gracefully', async () => {
       // Setup initial data
-      mockLocalStorage.distractingSites = [{
-        id: 'site1',
-        urlPattern: 'example.com',
-        dailyLimitSeconds: 3600,
-        isEnabled: true
-      }];
+      mockLocalStorage.distractingSites = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        },
+      ];
 
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: true,
-        siteId: 'site1'
+        siteId: 'site1',
       });
 
       // Simulate extension context invalidation on badge API
@@ -109,14 +117,16 @@ describe('Performance and Error Handling Integration', () => {
       );
 
       // Import and test badge manager
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
-      
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
+
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Mock a tab for the new API
       global.browser.tabs.get.mockResolvedValue({
         id: 1,
-        url: 'https://example.com'
+        url: 'https://example.com',
       });
 
       // Should not throw error, should handle gracefully
@@ -136,8 +146,10 @@ describe('Performance and Error Handling Integration', () => {
       );
 
       // Test by importing validation utils which doesn't depend on DOM
-      const validationUtils = await import('../../background_scripts/validation_utils.js');
-      
+      const validationUtils = await import(
+        '../../background_scripts/validation_utils.js'
+      );
+
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Should handle storage error gracefully in API calls
@@ -159,8 +171,10 @@ describe('Performance and Error Handling Integration', () => {
       );
 
       // Test badge manager which handles network errors
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
-      
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
+
       // Should load without errors and handle network issues gracefully
       expect(badgeManager).toBeDefined();
       expect(badgeManager.updateBadge).toBeDefined();
@@ -175,13 +189,15 @@ describe('Performance and Error Handling Integration', () => {
         }
         return Promise.resolve({
           success: true,
-          data: { hostname: 'example.com', isDistractingSite: false }
+          data: { hostname: 'example.com', isDistractingSite: false },
         });
       });
 
       // Test validation utils which has retry logic
-      const validationUtils = await import('../../background_scripts/validation_utils.js');
-      
+      const validationUtils = await import(
+        '../../background_scripts/validation_utils.js'
+      );
+
       // Should be defined and functional
       expect(validationUtils).toBeDefined();
       expect(validationUtils.safeBrowserApiCall).toBeDefined();
@@ -192,27 +208,32 @@ describe('Performance and Error Handling Integration', () => {
     test('should handle rapid badge updates efficiently', async () => {
       const startTime = Date.now();
 
-      mockLocalStorage.distractingSites = Array.from({ length: 100 }, (_, i) => ({
-        id: `site${i}`,
-        urlPattern: `example${i}.com`,
-        dailyLimitSeconds: 3600,
-        isEnabled: true
-      }));
+      mockLocalStorage.distractingSites = Array.from(
+        { length: 100 },
+        (_, i) => ({
+          id: `site${i}`,
+          urlPattern: `example${i}.com`,
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        })
+      );
 
       global.browser.action.setBadgeText.mockResolvedValue(undefined);
 
       // Mock distraction detector for performance test
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: false,
-        siteId: null
+        siteId: null,
       });
 
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
 
       // Mock tabs for the new API
       global.browser.tabs.get.mockImplementation(async (tabId) => ({
         id: tabId,
-        url: `https://example${tabId}.com`
+        url: `https://example${tabId}.com`,
       }));
 
       // Simulate rapid badge updates
@@ -231,7 +252,9 @@ describe('Performance and Error Handling Integration', () => {
     });
 
     test('should handle memory-intensive validation operations', async () => {
-      const validationUtils = await import('../../background_scripts/validation_utils.js');
+      const validationUtils = await import(
+        '../../background_scripts/validation_utils.js'
+      );
 
       const startTime = Date.now();
 
@@ -241,11 +264,11 @@ describe('Performance and Error Handling Integration', () => {
         urlPattern: `example${i}.com`,
         isEnabled: true,
         dailyLimitSeconds: 3600,
-        dailyOpenLimit: 10
+        dailyOpenLimit: 10,
       }));
 
       let validCount = 0;
-      largeSites.forEach(site => {
+      largeSites.forEach((site) => {
         const result = validationUtils.validateSiteObject(site);
         if (result.isValid) validCount++;
       });
@@ -259,22 +282,24 @@ describe('Performance and Error Handling Integration', () => {
     test('should handle concurrent operations efficiently', async () => {
       global.browser.runtime.sendMessage.mockResolvedValue({
         success: true,
-        data: { hostname: 'example.com', isDistractingSite: false }
+        data: { hostname: 'example.com', isDistractingSite: false },
       });
 
       // Test badge manager concurrency
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
 
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: false,
-        siteId: null
+        siteId: null,
       });
 
       // Mock tabs for the new API
       global.browser.tabs.get.mockImplementation(async (tabId) => ({
         id: tabId,
-        url: `https://example${tabId}.com`
+        url: `https://example${tabId}.com`,
       }));
 
       // Simulate multiple concurrent operations
@@ -295,27 +320,31 @@ describe('Performance and Error Handling Integration', () => {
 
   describe('Cache Performance and Memory Management', () => {
     test('should efficiently manage badge cache', async () => {
-      mockLocalStorage.distractingSites = [{
-        id: 'site1',
-        urlPattern: 'example.com',
-        dailyLimitSeconds: 3600,
-        isEnabled: true
-      }];
+      mockLocalStorage.distractingSites = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        },
+      ];
 
       global.browser.action.setBadgeText.mockResolvedValue(undefined);
 
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: true,
-        siteId: 'site1'
+        siteId: 'site1',
       });
 
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
 
       // Mock tab for the new API
       global.browser.tabs.get.mockResolvedValue({
         id: 1,
-        url: 'https://example.com'
+        url: 'https://example.com',
       });
 
       // First call
@@ -324,34 +353,39 @@ describe('Performance and Error Handling Integration', () => {
       // Second call
       await badgeManager.updateBadge(1);
 
-      const secondCallCount = global.browser.action.setBadgeText.mock.calls.length;
+      const secondCallCount =
+        global.browser.action.setBadgeText.mock.calls.length;
 
       // Should demonstrate some level of optimization
       expect(secondCallCount).toBeGreaterThan(0);
     });
 
     test('should handle cache expiration correctly', async () => {
-      mockLocalStorage.distractingSites = [{
-        id: 'site1',
-        urlPattern: 'example.com',
-        dailyLimitSeconds: 3600,
-        isEnabled: true
-      }];
+      mockLocalStorage.distractingSites = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600,
+          isEnabled: true,
+        },
+      ];
 
       global.browser.action.setBadgeText.mockResolvedValue(undefined);
 
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: true,
-        siteId: 'site1'
+        siteId: 'site1',
       });
 
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
 
       // Mock tab for the new API
       global.browser.tabs.get.mockResolvedValue({
         id: 1,
-        url: 'https://example.com'
+        url: 'https://example.com',
       });
 
       // First call
@@ -368,20 +402,26 @@ describe('Performance and Error Handling Integration', () => {
   describe('Error Boundary Integration', () => {
     test('should maintain system stability during cascading failures', async () => {
       // Simulate multiple system failures
-      global.browser.storage.local.get.mockRejectedValue(new Error('Storage failure'));
-      global.browser.runtime.sendMessage.mockRejectedValue(new Error('Message failure'));
-      global.browser.action.setBadgeText.mockRejectedValue(new Error('Badge failure'));
+      global.browser.storage.local.get.mockRejectedValue(
+        new Error('Storage failure')
+      );
+      global.browser.runtime.sendMessage.mockRejectedValue(
+        new Error('Message failure')
+      );
+      global.browser.action.setBadgeText.mockRejectedValue(
+        new Error('Badge failure')
+      );
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Import modules that don't depend on DOM - should not crash
       const modules = await Promise.allSettled([
         import('../../background_scripts/badge_manager.js'),
-        import('../../background_scripts/validation_utils.js')
+        import('../../background_scripts/validation_utils.js'),
       ]);
 
       // Modules should load despite errors
-      modules.forEach(result => {
+      modules.forEach((result) => {
         expect(result.status).toBe('fulfilled');
         expect(result.value).toBeDefined();
       });
@@ -390,7 +430,9 @@ describe('Performance and Error Handling Integration', () => {
     });
 
     test('should handle validation errors across components', async () => {
-      const validationUtils = await import('../../background_scripts/validation_utils.js');
+      const validationUtils = await import(
+        '../../background_scripts/validation_utils.js'
+      );
 
       // Test various validation scenarios
       const testCases = [
@@ -398,10 +440,10 @@ describe('Performance and Error Handling Integration', () => {
         { input: undefined, type: 'undefined input' },
         { input: '', type: 'empty string' },
         { input: 'javascript:alert()', type: 'dangerous input' },
-        { input: 'a'.repeat(3000), type: 'oversized input' }
+        { input: 'a'.repeat(3000), type: 'oversized input' },
       ];
 
-      testCases.forEach(testCase => {
+      testCases.forEach((testCase) => {
         const result = validationUtils.validateUrlPattern(testCase.input);
         expect(result).toHaveProperty('isValid');
         expect(result).toHaveProperty('error');
@@ -413,34 +455,38 @@ describe('Performance and Error Handling Integration', () => {
   describe('Cross-Component Performance', () => {
     test('should handle coordinated operations efficiently', async () => {
       // Setup comprehensive test scenario
-      mockLocalStorage.distractingSites = [{
-        id: 'site1',
-        urlPattern: 'example.com',
-        dailyLimitSeconds: 3600,
-        dailyOpenLimit: 10,
-        isEnabled: true
-      }];
+      mockLocalStorage.distractingSites = [
+        {
+          id: 'site1',
+          urlPattern: 'example.com',
+          dailyLimitSeconds: 3600,
+          dailyOpenLimit: 10,
+          isEnabled: true,
+        },
+      ];
 
       const currentDate = new Date().toISOString().split('T')[0];
       mockLocalStorage[`usage_${currentDate}`] = {
-        site1: { timeSpentSeconds: 1800, opens: 5 }
+        site1: { timeSpentSeconds: 1800, opens: 5 },
       };
 
       global.browser.runtime.sendMessage.mockResolvedValue({
         success: true,
         data: {
           distractingSites: mockLocalStorage.distractingSites,
-          usageStats: mockLocalStorage[`usage_${currentDate}`]
-        }
+          usageStats: mockLocalStorage[`usage_${currentDate}`],
+        },
       });
 
       global.browser.action.setBadgeText.mockResolvedValue(undefined);
-      global.browser.tabs.query.mockResolvedValue([{ id: 1, url: 'https://example.com' }]);
+      global.browser.tabs.query.mockResolvedValue([
+        { id: 1, url: 'https://example.com' },
+      ]);
 
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: true,
-        siteId: 'site1'
+        siteId: 'site1',
       });
 
       const startTime = Date.now();
@@ -448,13 +494,13 @@ describe('Performance and Error Handling Integration', () => {
       // Import and test multiple modules
       const [badgeManager, validationUtils] = await Promise.all([
         import('../../background_scripts/badge_manager.js'),
-        import('../../background_scripts/validation_utils.js')
+        import('../../background_scripts/validation_utils.js'),
       ]);
 
       // Mock tab for the new API
       global.browser.tabs.get.mockResolvedValue({
         id: 1,
-        url: 'https://example.com'
+        url: 'https://example.com',
       });
 
       // Perform coordinated operations
@@ -464,8 +510,8 @@ describe('Performance and Error Handling Integration', () => {
           id: 'new-site',
           urlPattern: 'test.com',
           isEnabled: true,
-          dailyLimitSeconds: 1800
-        })
+          dailyLimitSeconds: 1800,
+        }),
       ];
 
       await Promise.all(operations);
@@ -477,14 +523,16 @@ describe('Performance and Error Handling Integration', () => {
     });
 
     test('should maintain performance during high-frequency operations', async () => {
-      const badgeManager = await import('../../background_scripts/badge_manager.js');
-      
+      const badgeManager = await import(
+        '../../background_scripts/badge_manager.js'
+      );
+
       global.browser.action.setBadgeText.mockResolvedValue(undefined);
 
       // Mock distraction detector
       mockDistractionDetector.checkIfUrlIsDistracting.mockReturnValue({
         isMatch: false,
-        siteId: null
+        siteId: null,
       });
 
       const operationCount = 200;
@@ -493,7 +541,7 @@ describe('Performance and Error Handling Integration', () => {
       // Mock tabs for the new API
       global.browser.tabs.get.mockImplementation(async (tabId) => ({
         id: tabId,
-        url: `https://example${tabId % 5}.com`
+        url: `https://example${tabId % 5}.com`,
       }));
 
       // High-frequency badge updates
@@ -510,7 +558,7 @@ describe('Performance and Error Handling Integration', () => {
 
       // Should maintain reasonable performance
       expect(duration).toBeLessThan(3000);
-      
+
       // Should have some level of optimization (not 1:1 calls due to debouncing/caching)
       const apiCalls = global.browser.action.setBadgeText.mock.calls.length;
       expect(apiCalls).toBeLessThan(operationCount);
@@ -522,11 +570,11 @@ describe('Performance and Error Handling Integration', () => {
       // Import modules that don't access DOM
       const modules = await Promise.allSettled([
         import('../../background_scripts/badge_manager.js'),
-        import('../../background_scripts/validation_utils.js')
+        import('../../background_scripts/validation_utils.js'),
       ]);
 
       // All modules should load
-      modules.forEach(result => {
+      modules.forEach((result) => {
         expect(result.status).toBe('fulfilled');
         expect(result.value).toBeDefined();
       });
@@ -536,20 +584,22 @@ describe('Performance and Error Handling Integration', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Setup error-prone environment
-      global.browser.storage.local.get.mockRejectedValue(new Error('Storage error'));
+      global.browser.storage.local.get.mockRejectedValue(
+        new Error('Storage error')
+      );
 
       // Import modules that should handle cleanup even during errors
       const modules = await Promise.allSettled([
         import('../../background_scripts/badge_manager.js'),
-        import('../../background_scripts/validation_utils.js')
+        import('../../background_scripts/validation_utils.js'),
       ]);
 
       // Should not prevent module loading
-      modules.forEach(result => {
+      modules.forEach((result) => {
         expect(result.status).toBe('fulfilled');
       });
 
       consoleSpy.mockRestore();
     });
   });
-}); 
+});

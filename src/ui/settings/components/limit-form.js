@@ -24,13 +24,13 @@ export class LimitForm {
     this.siteData = config.siteData;
     this.onUpdate = config.onUpdate || (() => {});
     this.onDelete = config.onDelete || (() => {});
-    
+
     this.editors = {};
     this.elements = {};
-    
+
     this.init();
   }
-  
+
   /**
    * Initializes the limit form component.
    * @private
@@ -40,7 +40,7 @@ export class LimitForm {
     this.createFormStructure();
     this.setupInlineEditors();
   }
-  
+
   /**
    * Creates the basic form structure.
    * @private
@@ -80,37 +80,47 @@ export class LimitForm {
         </div>
       </div>
     `;
-    
+
     // Get element references
-    this.elements.toggleCheckbox = this.container.querySelector('.toggle-site-checkbox');
+    this.elements.toggleCheckbox = this.container.querySelector(
+      '.toggle-site-checkbox'
+    );
     this.elements.toggleLabel = this.container.querySelector('.toggle-label');
     this.elements.deleteBtn = this.container.querySelector('.delete-site-btn');
-    this.elements.timeLimitEditor = this.container.querySelector('#time-limit-editor');
-    this.elements.openLimitEditor = this.container.querySelector('#open-limit-editor');
-    
+    this.elements.timeLimitEditor =
+      this.container.querySelector('#time-limit-editor');
+    this.elements.openLimitEditor =
+      this.container.querySelector('#open-limit-editor');
+
     // Setup event listeners
-    this.elements.toggleCheckbox.addEventListener('change', () => this.handleToggle());
-    this.elements.deleteBtn.addEventListener('click', () => this.handleDelete());
+    this.elements.toggleCheckbox.addEventListener('change', () =>
+      this.handleToggle()
+    );
+    this.elements.deleteBtn.addEventListener('click', () =>
+      this.handleDelete()
+    );
   }
-  
+
   /**
    * Sets up inline editors for time and open limits.
    * @private
    */
   setupInlineEditors() {
     // Time limit editor
-    const timeLimitMinutes = this.siteData.dailyLimitSeconds > 0 
-      ? Math.round(this.siteData.dailyLimitSeconds / 60) 
-      : 0;
-    
+    const timeLimitMinutes =
+      this.siteData.dailyLimitSeconds > 0
+        ? Math.round(this.siteData.dailyLimitSeconds / 60)
+        : 0;
+
     this.editors.timeLimit = new InlineEditor({
       container: this.elements.timeLimitEditor,
-      initialValue: timeLimitMinutes > 0 ? timeLimitMinutes.toString() : 'No limit',
+      initialValue:
+        timeLimitMinutes > 0 ? timeLimitMinutes.toString() : 'No limit',
       inputType: 'number',
       placeholder: 'Minutes (e.g., 60)',
       inputAttributes: {
         min: '1',
-        max: '1440'
+        max: '1440',
       },
       validation: {
         required: false,
@@ -121,15 +131,15 @@ export class LimitForm {
           const num = parseInt(value);
           if (isNaN(num)) return 'Please enter a valid number';
           return true;
-        }
+        },
       },
       onSave: (newValue) => this.handleTimeLimitSave(newValue),
-      onCancel: () => console.log('[LimitForm] Time limit edit cancelled')
+      onCancel: () => console.log('[LimitForm] Time limit edit cancelled'),
     });
-    
+
     // Open limit editor
     const openLimit = this.siteData.dailyOpenLimit || 0;
-    
+
     this.editors.openLimit = new InlineEditor({
       container: this.elements.openLimitEditor,
       initialValue: openLimit > 0 ? openLimit.toString() : 'No limit',
@@ -137,7 +147,7 @@ export class LimitForm {
       placeholder: 'Opens (e.g., 5)',
       inputAttributes: {
         min: '1',
-        max: '100'
+        max: '100',
       },
       validation: {
         required: false,
@@ -148,13 +158,13 @@ export class LimitForm {
           const num = parseInt(value);
           if (isNaN(num)) return 'Please enter a valid number';
           return true;
-        }
+        },
       },
       onSave: (newValue) => this.handleOpenLimitSave(newValue),
-      onCancel: () => console.log('[LimitForm] Open limit edit cancelled')
+      onCancel: () => console.log('[LimitForm] Open limit edit cancelled'),
     });
   }
-  
+
   /**
    * Handles time limit save.
    * @private
@@ -163,22 +173,21 @@ export class LimitForm {
   async handleTimeLimitSave(newValue) {
     const minutes = newValue.trim() === '' ? 0 : parseInt(newValue);
     const seconds = minutes * 60;
-    
+
     const updates = { dailyLimitSeconds: seconds };
-    
+
     try {
       await this.onUpdate(this.siteData.id, updates);
       this.siteData.dailyLimitSeconds = seconds;
-      
+
       // Update display value
       const displayValue = minutes > 0 ? `${minutes} min` : 'No limit';
       this.editors.timeLimit.updateValue(displayValue);
-      
     } catch (error) {
       throw new Error(error.message || 'Failed to update time limit');
     }
   }
-  
+
   /**
    * Handles open limit save.
    * @private
@@ -186,48 +195,46 @@ export class LimitForm {
    */
   async handleOpenLimitSave(newValue) {
     const opens = newValue.trim() === '' ? 0 : parseInt(newValue);
-    
+
     const updates = opens > 0 ? { dailyOpenLimit: opens } : {};
-    
+
     // If we're removing the open limit, we need to explicitly remove it
     if (opens === 0 && this.siteData.dailyOpenLimit) {
       // We'll set it to undefined to remove it, but the backend should handle this
       updates.dailyOpenLimit = 0;
     }
-    
+
     try {
       await this.onUpdate(this.siteData.id, updates);
-      
+
       if (opens > 0) {
         this.siteData.dailyOpenLimit = opens;
       } else {
         delete this.siteData.dailyOpenLimit;
       }
-      
+
       // Update display value
       const displayValue = opens > 0 ? `${opens} opens` : 'No limit';
       this.editors.openLimit.updateValue(displayValue);
-      
     } catch (error) {
       throw new Error(error.message || 'Failed to update open limit');
     }
   }
-  
+
   /**
    * Handles toggle switch change (enable/disable site).
    * @private
    */
   async handleToggle() {
     const newEnabledState = this.elements.toggleCheckbox.checked;
-    
+
     try {
       this.elements.toggleCheckbox.disabled = true;
-      
+
       await this.onUpdate(this.siteData.id, { isEnabled: newEnabledState });
-      
+
       this.siteData.isEnabled = newEnabledState;
       this.updateToggleSwitch();
-      
     } catch (error) {
       console.error('[LimitForm] Error toggling site:', error);
       // Revert checkbox state on error
@@ -236,25 +243,27 @@ export class LimitForm {
       this.elements.toggleCheckbox.disabled = false;
     }
   }
-  
+
   /**
    * Updates the toggle switch appearance.
    * @private
    */
   updateToggleSwitch() {
     const isEnabled = this.siteData.isEnabled;
-    
+
     this.elements.toggleCheckbox.checked = isEnabled;
     this.elements.toggleLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
   }
-  
+
   /**
    * Handles delete button click.
    * @private
    */
   async handleDelete() {
-    const confirmed = confirm(`Are you sure you want to delete the limit for ${this.siteData.urlPattern}?`);
-    
+    const confirmed = confirm(
+      `Are you sure you want to delete the limit for ${this.siteData.urlPattern}?`
+    );
+
     if (confirmed) {
       try {
         this.elements.deleteBtn.disabled = true;
@@ -267,29 +276,31 @@ export class LimitForm {
       }
     }
   }
-  
+
   /**
    * Updates the site data and refreshes the form.
    * @param {Object} newSiteData - The updated site data
    */
   updateSiteData(newSiteData) {
     this.siteData = { ...newSiteData };
-    
+
     // Update editors with new values
-    const timeLimitMinutes = this.siteData.dailyLimitSeconds > 0 
-      ? Math.round(this.siteData.dailyLimitSeconds / 60) 
-      : 0;
-    const timeLimitDisplay = timeLimitMinutes > 0 ? `${timeLimitMinutes} min` : 'No limit';
+    const timeLimitMinutes =
+      this.siteData.dailyLimitSeconds > 0
+        ? Math.round(this.siteData.dailyLimitSeconds / 60)
+        : 0;
+    const timeLimitDisplay =
+      timeLimitMinutes > 0 ? `${timeLimitMinutes} min` : 'No limit';
     this.editors.timeLimit.updateValue(timeLimitDisplay);
-    
+
     const openLimit = this.siteData.dailyOpenLimit || 0;
     const openLimitDisplay = openLimit > 0 ? `${openLimit} opens` : 'No limit';
     this.editors.openLimit.updateValue(openLimitDisplay);
-    
+
     // Update toggle switch
     this.updateToggleSwitch();
   }
-  
+
   /**
    * Destroys the limit form and cleans up.
    */
@@ -301,12 +312,12 @@ export class LimitForm {
     if (this.editors.openLimit) {
       this.editors.openLimit.destroy();
     }
-    
+
     // Clear container
     this.container.innerHTML = '';
     this.container.classList.remove('limit-form');
   }
-  
+
   /**
    * Escapes HTML entities to prevent XSS.
    * @private
@@ -318,4 +329,4 @@ export class LimitForm {
     div.textContent = text;
     return div.innerHTML;
   }
-} 
+}

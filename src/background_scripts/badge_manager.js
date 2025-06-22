@@ -8,7 +8,10 @@
 
 import { getDistractingSites } from './site_storage.js';
 import { getUsageStats } from './usage_storage.js';
-import { checkIfUrlIsDistracting, initializeDistractionDetector } from './distraction_detector.js';
+import {
+  checkIfUrlIsDistracting,
+  initializeDistractionDetector,
+} from './distraction_detector.js';
 
 // Ensure detector is initialized
 let _detectorInitialized = false;
@@ -22,9 +25,14 @@ async function _ensureDetectorInitialized() {
     try {
       await initializeDistractionDetector();
       _detectorInitialized = true;
-      console.log('[BadgeManager] Distraction detector initialized successfully');
+      console.log(
+        '[BadgeManager] Distraction detector initialized successfully'
+      );
     } catch (error) {
-      console.error('[BadgeManager] Failed to initialize distraction detector:', error);
+      console.error(
+        '[BadgeManager] Failed to initialize distraction detector:',
+        error
+      );
     }
   }
 }
@@ -49,12 +57,12 @@ function _getCurrentDateString() {
  * @returns {string} Formatted time string (e.g., "45m", "2h", "90s")
  */
 function _formatRemainingTime(remainingSeconds) {
-  if (remainingSeconds <= 0) return "0s";
-  
+  if (remainingSeconds <= 0) return '0s';
+
   const hours = Math.floor(remainingSeconds / 3600);
   const minutes = Math.floor((remainingSeconds % 3600) / 60);
   const seconds = remainingSeconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}h`;
   } else if (minutes > 0) {
@@ -71,7 +79,7 @@ function _formatRemainingTime(remainingSeconds) {
  * @returns {string} Formatted opens string (e.g., "5", "12")
  */
 function _formatRemainingOpens(remainingOpens) {
-  if (remainingOpens <= 0) return "0";
+  if (remainingOpens <= 0) return '0';
   return remainingOpens.toString();
 }
 
@@ -83,39 +91,42 @@ function _formatRemainingOpens(remainingOpens) {
  * @returns {string} Badge text to display, or empty string if no limits apply
  */
 function _calculateBadgeText(site, usageStats) {
-  if (!site || !site.isEnabled) return "";
-  
+  if (!site || !site.isEnabled) return '';
+
   const siteUsage = usageStats[site.id] || { timeSpentSeconds: 0, opens: 0 };
   const parts = [];
-  
+
   // Calculate remaining time if time limit is set
   if (site.dailyLimitSeconds > 0) {
-    const remainingSeconds = Math.max(0, site.dailyLimitSeconds - siteUsage.timeSpentSeconds);
+    const remainingSeconds = Math.max(
+      0,
+      site.dailyLimitSeconds - siteUsage.timeSpentSeconds
+    );
     if (remainingSeconds > 0) {
       parts.push(_formatRemainingTime(remainingSeconds));
     } else {
-      parts.push("0s");
+      parts.push('0s');
     }
   }
-  
+
   // Calculate remaining opens if open limit is set
   if (site.dailyOpenLimit > 0) {
     const remainingOpens = Math.max(0, site.dailyOpenLimit - siteUsage.opens);
     if (remainingOpens > 0) {
       parts.push(_formatRemainingOpens(remainingOpens));
     } else {
-      parts.push("0");
+      parts.push('0');
     }
   }
-  
+
   // Join parts with a separator if both exist
   if (parts.length > 1) {
     return parts.join('/');
   } else if (parts.length === 1) {
     return parts[0];
   }
-  
-  return "";
+
+  return '';
 }
 
 /**
@@ -130,14 +141,20 @@ function _manualDistractionCheck(url, sites) {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname;
-    
+
     for (const site of sites) {
-      if (site.isEnabled && site.urlPattern && hostname.includes(site.urlPattern)) {
-        console.log(`[BadgeManager] Manual match found: ${hostname} contains ${site.urlPattern} (site ID: ${site.id})`);
+      if (
+        site.isEnabled &&
+        site.urlPattern &&
+        hostname.includes(site.urlPattern)
+      ) {
+        console.log(
+          `[BadgeManager] Manual match found: ${hostname} contains ${site.urlPattern} (site ID: ${site.id})`
+        );
         return { isMatch: true, siteId: site.id };
       }
     }
-    
+
     return { isMatch: false, siteId: null };
   } catch (error) {
     console.warn('[BadgeManager] Error in manual distraction check:', error);
@@ -155,14 +172,14 @@ async function _setBadgeText(tabId, text) {
   try {
     await browser.action.setBadgeText({
       text: text,
-      tabId: tabId
+      tabId: tabId,
     });
-    
+
     // Set badge background color for better visibility
     if (text) {
       await browser.action.setBadgeBackgroundColor({
         color: [0, 122, 255, 255], // Blue background
-        tabId: tabId
+        tabId: tabId,
       });
     }
   } catch (error) {
@@ -173,7 +190,7 @@ async function _setBadgeText(tabId, text) {
 /**
  * Updates the badge for a specific tab by fetching current data from storage.
  * This is the main function that should be called from background.js.
- * 
+ *
  * @async
  * @function updateBadge
  * @param {number} tabId - The ID of the tab to update the badge for
@@ -181,16 +198,19 @@ async function _setBadgeText(tabId, text) {
  */
 export async function updateBadge(tabId) {
   console.log(`[BadgeManager] updateBadge called for tab ${tabId}`);
-  
+
   if (!tabId) {
-    console.warn('[BadgeManager] Invalid tabId provided to updateBadge:', tabId);
+    console.warn(
+      '[BadgeManager] Invalid tabId provided to updateBadge:',
+      tabId
+    );
     return;
   }
 
   try {
     // Ensure distraction detector is initialized
     await _ensureDetectorInitialized();
-    
+
     // Get tab information
     const tab = await browser.tabs.get(tabId);
     if (!tab || !tab.url) {
@@ -201,11 +221,13 @@ export async function updateBadge(tabId) {
     console.log(`[BadgeManager] Processing tab ${tabId} with URL: ${tab.url}`);
 
     // Skip internal pages
-    if (tab.url.startsWith('chrome://') || 
-        tab.url.startsWith('moz-extension://') || 
-        tab.url.startsWith('about:')) {
+    if (
+      tab.url.startsWith('chrome://') ||
+      tab.url.startsWith('moz-extension://') ||
+      tab.url.startsWith('about:')
+    ) {
       console.log(`[BadgeManager] Skipping internal page: ${tab.url}`);
-      await _setBadgeText(tabId, "");
+      await _setBadgeText(tabId, '');
       return;
     }
 
@@ -215,36 +237,56 @@ export async function updateBadge(tabId) {
 
     // Check if URL is a distracting site (with fallback)
     let distractionCheck = checkIfUrlIsDistracting(tab.url);
-    console.log(`[BadgeManager] Primary distraction check result:`, distractionCheck);
-    
+    console.log(
+      `[BadgeManager] Primary distraction check result:`,
+      distractionCheck
+    );
+
     // If primary check failed due to initialization, use manual fallback
     if (!distractionCheck.isMatch && !distractionCheck.siteId) {
-      console.log(`[BadgeManager] Primary check failed, trying manual fallback`);
+      console.log(
+        `[BadgeManager] Primary check failed, trying manual fallback`
+      );
       distractionCheck = _manualDistractionCheck(tab.url, sites);
-      console.log(`[BadgeManager] Manual distraction check result:`, distractionCheck);
+      console.log(
+        `[BadgeManager] Manual distraction check result:`,
+        distractionCheck
+      );
     }
-    
+
     if (!distractionCheck.isMatch || !distractionCheck.siteId) {
       // Not a distracting site, clear badge
-      console.log(`[BadgeManager] Not a distracting site, clearing badge for tab ${tabId}`);
-      await _setBadgeText(tabId, "");
+      console.log(
+        `[BadgeManager] Not a distracting site, clearing badge for tab ${tabId}`
+      );
+      await _setBadgeText(tabId, '');
       return;
     }
 
     // Get usage data from storage
-    console.log(`[BadgeManager] Fetching usage data for date: ${_getCurrentDateString()}`);
-    const usageStats = await getUsageStats(_getCurrentDateString()).catch(error => {
-      console.warn('[BadgeManager] Failed to fetch usage stats, using empty data:', error);
-      return {};
-    });
+    console.log(
+      `[BadgeManager] Fetching usage data for date: ${_getCurrentDateString()}`
+    );
+    const usageStats = await getUsageStats(_getCurrentDateString()).catch(
+      (error) => {
+        console.warn(
+          '[BadgeManager] Failed to fetch usage stats, using empty data:',
+          error
+        );
+        return {};
+      }
+    );
 
     console.log(`[BadgeManager] Retrieved usage stats:`, usageStats);
 
     // Find the specific site
-    const site = sites.find(s => s.id === distractionCheck.siteId);
+    const site = sites.find((s) => s.id === distractionCheck.siteId);
     if (!site) {
-      console.warn('[BadgeManager] Site not found in storage:', distractionCheck.siteId);
-      await _setBadgeText(tabId, "");
+      console.warn(
+        '[BadgeManager] Site not found in storage:',
+        distractionCheck.siteId
+      );
+      await _setBadgeText(tabId, '');
       return;
     }
 
@@ -253,24 +295,28 @@ export async function updateBadge(tabId) {
       urlPattern: site.urlPattern,
       dailyLimitSeconds: site.dailyLimitSeconds,
       dailyOpenLimit: site.dailyOpenLimit,
-      isEnabled: site.isEnabled
+      isEnabled: site.isEnabled,
     });
 
     // Calculate and set badge text
     const badgeText = _calculateBadgeText(site, usageStats);
     console.log(`[BadgeManager] Calculated badge text: "${badgeText}"`);
-    
-    await _setBadgeText(tabId, badgeText);
-    
-    console.log(`[BadgeManager] Successfully updated badge for tab ${tabId}: "${badgeText}"`);
 
+    await _setBadgeText(tabId, badgeText);
+
+    console.log(
+      `[BadgeManager] Successfully updated badge for tab ${tabId}: "${badgeText}"`
+    );
   } catch (error) {
     console.error('[BadgeManager] Error in updateBadge:', error);
     // Clear badge on error to avoid showing stale data
     try {
-      await _setBadgeText(tabId, "");
+      await _setBadgeText(tabId, '');
     } catch (clearError) {
-      console.error('[BadgeManager] Error clearing badge after failure:', clearError);
+      console.error(
+        '[BadgeManager] Error clearing badge after failure:',
+        clearError
+      );
     }
   }
 }
@@ -290,10 +336,10 @@ export async function clearBadge(tabId) {
 
   try {
     await browser.action.setBadgeText({
-      text: "",
-      tabId: tabId
+      text: '',
+      tabId: tabId,
     });
   } catch (error) {
     console.error('[BadgeManager] Error clearing badge:', error);
   }
-} 
+}

@@ -15,7 +15,9 @@
  */
 export async function getUsageStats(dateString) {
   if (!dateString || typeof dateString !== 'string') {
-    console.error("Error: dateString parameter is required and must be a string for getUsageStats.");
+    console.error(
+      'Error: dateString parameter is required and must be a string for getUsageStats.'
+    );
     return {};
   }
   const key = `usageStats-${dateString}`;
@@ -41,27 +43,34 @@ export async function getUsageStats(dateString) {
  * @returns {Promise<boolean>} A promise that resolves to true on success, false on failure.
  */
 export async function updateUsageStats(dateString, siteId, usageData) {
-    if (!dateString || typeof dateString !== 'string') {
-        console.error("Invalid dateString provided to updateUsageStats.");
-        return false;
-    }
-    if (!siteId || typeof siteId !== 'string') {
-        console.error("Invalid siteId provided to updateUsageStats.");
-        return false;
-    }
-    if (!usageData || typeof usageData.timeSpentSeconds !== 'number' || typeof usageData.opens !== 'number') {
-        console.error("Invalid usageData provided to updateUsageStats.", usageData);
-        return false;
-    }
+  if (!dateString || typeof dateString !== 'string') {
+    console.error('Invalid dateString provided to updateUsageStats.');
+    return false;
+  }
+  if (!siteId || typeof siteId !== 'string') {
+    console.error('Invalid siteId provided to updateUsageStats.');
+    return false;
+  }
+  if (
+    !usageData ||
+    typeof usageData.timeSpentSeconds !== 'number' ||
+    typeof usageData.opens !== 'number'
+  ) {
+    console.error('Invalid usageData provided to updateUsageStats.', usageData);
+    return false;
+  }
 
-    const key = `usageStats-${dateString}`;
-    try {
-        const dailyStats = await getUsageStats(dateString);
-        dailyStats[siteId] = usageData;
-        await browser.storage.local.set({ [key]: dailyStats });
-        return true;
-    } catch (error) {
-        console.error(`Error updating usage stats for site ${siteId} on date ${dateString}:`, error);
-        return false;
-    }
-} 
+  const key = `usageStats-${dateString}`;
+  try {
+    const dailyStats = await getUsageStats(dateString);
+    dailyStats[siteId] = usageData;
+    await browser.storage.local.set({ [key]: dailyStats });
+    return true;
+  } catch (error) {
+    console.error(
+      `Error updating usage stats for site ${siteId} on date ${dateString}:`,
+      error
+    );
+    return false;
+  }
+}

@@ -217,7 +217,11 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background: linear-gradient(
+    90deg,
+    var(--accent-primary),
+    var(--accent-secondary)
+  );
   border-radius: var(--radius-lg);
   transition: width var(--transition-normal);
 }
@@ -467,15 +471,15 @@
   .popup-container {
     width: 320px;
   }
-  
+
   .preset-buttons {
     flex-direction: column;
   }
-  
+
   .form-actions {
     flex-direction: column;
   }
-  
+
   .btn-primary,
   .btn-secondary {
     justify-content: center;
@@ -510,7 +514,7 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
+
   .spinner {
     animation: none;
   }
@@ -526,4 +530,4 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
   border-color: var(--accent-primary);
-} 
+}

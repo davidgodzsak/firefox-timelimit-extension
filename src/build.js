@@ -43,7 +43,7 @@ async function createZip(sourceDir, outputPath) {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(outputPath);
     const archive = archiver('zip', {
-      zlib: { level: 9 } // Maximum compression
+      zlib: { level: 9 }, // Maximum compression
     });
 
     output.on('close', () => {
@@ -67,14 +67,16 @@ async function createZip(sourceDir, outputPath) {
 async function build() {
   const distDir = path.join(__dirname, 'dist');
   const manifestPath = path.join(__dirname, 'manifest.json');
-  
+
   console.log('🏗️  Starting Firefox extension build...\n');
 
   try {
     // Read manifest to get version
-    const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
+    const manifest = JSON.parse(
+      await fs.promises.readFile(manifestPath, 'utf8')
+    );
     const version = manifest.version;
-    
+
     console.log(`📦 Building version ${version}`);
 
     // Clean dist directory
@@ -92,12 +94,17 @@ async function build() {
     console.log('✅ Copied manifest.json');
 
     // Copy essential directories
-    const directoriesToCopy = ['background_scripts', 'ui', 'assets', '_locales'];
-    
+    const directoriesToCopy = [
+      'background_scripts',
+      'ui',
+      'assets',
+      '_locales',
+    ];
+
     for (const dir of directoriesToCopy) {
       const srcPath = path.join(__dirname, dir);
       const destPath = path.join(distDir, dir);
-      
+
       if (fs.existsSync(srcPath)) {
         await copyDirectory(srcPath, destPath);
         console.log(`✅ Copied ${dir}/`);
@@ -109,7 +116,7 @@ async function build() {
     // Create zip file
     const zipName = `timelimit-extension-v${version}.zip`;
     const zipPath = path.join(__dirname, zipName);
-    
+
     if (fs.existsSync(zipPath)) {
       await fs.promises.unlink(zipPath);
     }
@@ -125,19 +132,21 @@ async function build() {
       for (const entry of entries) {
         if (entry.isDirectory()) {
           console.log(`${prefix}📁 ${entry.name}/`);
-          await showDirectoryContents(path.join(dir, entry.name), prefix + '  ');
+          await showDirectoryContents(
+            path.join(dir, entry.name),
+            prefix + '  '
+          );
         } else {
           console.log(`${prefix}📄 ${entry.name}`);
         }
       }
     };
-    
-    await showDirectoryContents(distDir);
 
+    await showDirectoryContents(distDir);
   } catch (error) {
     console.error('❌ Build failed:', error);
     process.exit(1);
   }
 }
 
-build(); 
+build();

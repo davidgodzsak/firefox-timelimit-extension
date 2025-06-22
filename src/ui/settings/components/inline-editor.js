@@ -31,13 +31,13 @@ export class InlineEditor {
     this.validation = config.validation || {};
     this.placeholder = config.placeholder || '';
     this.inputAttributes = config.inputAttributes || {};
-    
+
     this.isEditing = false;
     this.elements = {};
-    
+
     this.init();
   }
-  
+
   /**
    * Initializes the inline editor component.
    * @private
@@ -48,7 +48,7 @@ export class InlineEditor {
     this.createEditMode();
     this.showDisplayMode();
   }
-  
+
   /**
    * Creates the display mode UI.
    * @private
@@ -56,11 +56,11 @@ export class InlineEditor {
   createDisplayMode() {
     this.elements.displayContainer = document.createElement('div');
     this.elements.displayContainer.className = 'inline-editor-display';
-    
+
     this.elements.displayText = document.createElement('span');
     this.elements.displayText.className = 'inline-editor-text';
     this.elements.displayText.textContent = this.currentValue;
-    
+
     this.elements.editButton = document.createElement('button');
     this.elements.editButton.className = 'inline-editor-edit-btn';
     this.elements.editButton.type = 'button';
@@ -71,14 +71,16 @@ export class InlineEditor {
         <path d="m14.5 5.5 3 3"/>
       </svg>
     `;
-    
-    this.elements.editButton.addEventListener('click', () => this.enterEditMode());
-    
+
+    this.elements.editButton.addEventListener('click', () =>
+      this.enterEditMode()
+    );
+
     this.elements.displayContainer.appendChild(this.elements.displayText);
     this.elements.displayContainer.appendChild(this.elements.editButton);
     this.container.appendChild(this.elements.displayContainer);
   }
-  
+
   /**
    * Creates the edit mode UI.
    * @private
@@ -86,21 +88,21 @@ export class InlineEditor {
   createEditMode() {
     this.elements.editContainer = document.createElement('div');
     this.elements.editContainer.className = 'inline-editor-edit';
-    
+
     this.elements.input = document.createElement('input');
     this.elements.input.type = this.inputType;
     this.elements.input.className = 'inline-editor-input';
     this.elements.input.value = this.currentValue;
     this.elements.input.placeholder = this.placeholder;
-    
+
     // Apply additional input attributes
     Object.entries(this.inputAttributes).forEach(([key, value]) => {
       this.elements.input.setAttribute(key, value);
     });
-    
+
     this.elements.buttonsContainer = document.createElement('div');
     this.elements.buttonsContainer.className = 'inline-editor-buttons';
-    
+
     this.elements.saveButton = document.createElement('button');
     this.elements.saveButton.className = 'inline-editor-save-btn';
     this.elements.saveButton.type = 'button';
@@ -110,7 +112,7 @@ export class InlineEditor {
         <polyline points="20,6 9,17 4,12"/>
       </svg>
     `;
-    
+
     this.elements.cancelButton = document.createElement('button');
     this.elements.cancelButton.className = 'inline-editor-cancel-btn';
     this.elements.cancelButton.type = 'button';
@@ -121,7 +123,7 @@ export class InlineEditor {
         <line x1="6" y1="6" x2="18" y2="18"/>
       </svg>
     `;
-    
+
     // Event listeners
     this.elements.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -132,26 +134,32 @@ export class InlineEditor {
         this.handleCancel();
       }
     });
-    
+
     this.elements.input.addEventListener('input', () => {
       this.validateInput();
       this.ensureButtonsVisible(); // Ensure buttons stay visible during typing
     });
-    
-    this.elements.input.addEventListener('focus', () => this.ensureButtonsVisible());
-    this.elements.input.addEventListener('blur', () => this.ensureButtonsVisible());
-    
+
+    this.elements.input.addEventListener('focus', () =>
+      this.ensureButtonsVisible()
+    );
+    this.elements.input.addEventListener('blur', () =>
+      this.ensureButtonsVisible()
+    );
+
     this.elements.saveButton.addEventListener('click', () => this.handleSave());
-    this.elements.cancelButton.addEventListener('click', () => this.handleCancel());
-    
+    this.elements.cancelButton.addEventListener('click', () =>
+      this.handleCancel()
+    );
+
     this.elements.buttonsContainer.appendChild(this.elements.saveButton);
     this.elements.buttonsContainer.appendChild(this.elements.cancelButton);
-    
+
     this.elements.editContainer.appendChild(this.elements.input);
     this.elements.editContainer.appendChild(this.elements.buttonsContainer);
     this.container.appendChild(this.elements.editContainer);
   }
-  
+
   /**
    * Shows the display mode and hides edit mode.
    * @private
@@ -162,7 +170,7 @@ export class InlineEditor {
     this.isEditing = false;
     this.container.classList.remove('editing');
   }
-  
+
   /**
    * Shows the edit mode and hides display mode.
    * @private
@@ -172,17 +180,17 @@ export class InlineEditor {
     this.elements.editContainer.style.display = 'flex';
     this.isEditing = true;
     this.container.classList.add('editing');
-    
+
     // Ensure buttons are always visible and positioned correctly
     this.ensureButtonsVisible();
-    
+
     // Focus the input and select all text
     setTimeout(() => {
       this.elements.input.focus();
       this.elements.input.select();
     }, 0);
   }
-  
+
   /**
    * Enters edit mode.
    */
@@ -201,13 +209,13 @@ export class InlineEditor {
       this.elements.buttonsContainer.style.display = 'flex';
       this.elements.buttonsContainer.style.visibility = 'visible';
       this.elements.buttonsContainer.style.opacity = '1';
-      
+
       // Ensure buttons are always accessible
       this.elements.saveButton.style.display = 'flex';
       this.elements.cancelButton.style.display = 'flex';
     }
   }
-  
+
   /**
    * Validates the current input value.
    * @private
@@ -217,13 +225,13 @@ export class InlineEditor {
     const value = this.elements.input.value.trim();
     let isValid = true;
     let errorMessage = '';
-    
+
     // Required validation
     if (this.validation.required && !value) {
       isValid = false;
       errorMessage = 'This field is required';
     }
-    
+
     // Type-specific validation
     if (isValid && this.inputType === 'number') {
       const numValue = parseFloat(value);
@@ -231,23 +239,33 @@ export class InlineEditor {
         isValid = false;
         errorMessage = 'Please enter a valid number';
       } else {
-        if (this.validation.min !== undefined && numValue < this.validation.min) {
+        if (
+          this.validation.min !== undefined &&
+          numValue < this.validation.min
+        ) {
           isValid = false;
           errorMessage = `Value must be at least ${this.validation.min}`;
         }
-        if (this.validation.max !== undefined && numValue > this.validation.max) {
+        if (
+          this.validation.max !== undefined &&
+          numValue > this.validation.max
+        ) {
           isValid = false;
           errorMessage = `Value must be at most ${this.validation.max}`;
         }
       }
     }
-    
+
     // Length validation
-    if (isValid && this.validation.maxLength && value.length > this.validation.maxLength) {
+    if (
+      isValid &&
+      this.validation.maxLength &&
+      value.length > this.validation.maxLength
+    ) {
       isValid = false;
       errorMessage = `Text must be ${this.validation.maxLength} characters or less`;
     }
-    
+
     // Custom validation
     if (isValid && this.validation.custom) {
       const customResult = this.validation.custom(value);
@@ -256,25 +274,27 @@ export class InlineEditor {
         errorMessage = customResult || 'Invalid value';
       }
     }
-    
+
     // Update UI based on validation
     this.elements.input.classList.toggle('invalid', !isValid);
     this.elements.saveButton.disabled = !isValid;
-    
+
     // Show/hide error message
     this.showValidationError(isValid ? '' : errorMessage);
-    
+
     return isValid;
   }
-  
+
   /**
    * Shows or hides validation error message.
    * @private
    * @param {string} message - Error message to show, or empty string to hide
    */
   showValidationError(message) {
-    let errorElement = this.elements.editContainer.querySelector('.inline-editor-error');
-    
+    let errorElement = this.elements.editContainer.querySelector(
+      '.inline-editor-error'
+    );
+
     if (message) {
       if (!errorElement) {
         errorElement = document.createElement('div');
@@ -287,7 +307,7 @@ export class InlineEditor {
       errorElement.style.display = 'none';
     }
   }
-  
+
   /**
    * Handles save button click.
    * @private
@@ -296,9 +316,9 @@ export class InlineEditor {
     if (!this.validateInput()) {
       return;
     }
-    
+
     const newValue = this.elements.input.value.trim();
-    
+
     try {
       this.elements.saveButton.disabled = true;
       this.elements.saveButton.innerHTML = `
@@ -306,14 +326,13 @@ export class InlineEditor {
           <circle cx="12" cy="12" r="10"/>
         </svg>
       `;
-      
+
       await this.onSave(newValue, this.currentValue);
-      
+
       // Update current value and display
       this.currentValue = newValue;
       this.elements.displayText.textContent = newValue;
       this.showDisplayMode();
-      
     } catch (error) {
       console.error('[InlineEditor] Error saving value:', error);
       this.showValidationError(error.message || 'Failed to save changes');
@@ -326,7 +345,7 @@ export class InlineEditor {
       `;
     }
   }
-  
+
   /**
    * Handles cancel button click.
    * @private
@@ -336,7 +355,7 @@ export class InlineEditor {
     this.showDisplayMode();
     this.onCancel();
   }
-  
+
   /**
    * Updates the displayed value.
    * @param {string} newValue - The new value to display
@@ -348,7 +367,7 @@ export class InlineEditor {
       this.elements.input.value = newValue;
     }
   }
-  
+
   /**
    * Gets the current value.
    * @returns {string} The current value
@@ -356,7 +375,7 @@ export class InlineEditor {
   getValue() {
     return this.currentValue;
   }
-  
+
   /**
    * Destroys the inline editor and removes event listeners.
    */
@@ -369,4 +388,4 @@ export class InlineEditor {
     }
     this.container.classList.remove('inline-editor', 'editing');
   }
-} 
+}

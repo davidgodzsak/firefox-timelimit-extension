@@ -1,4 +1,11 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
 /**
  * @file note_storage.test.js
@@ -24,7 +31,7 @@ import {
   getTimeoutNotes,
   addTimeoutNote,
   updateTimeoutNote,
-  deleteTimeoutNote
+  deleteTimeoutNote,
 } from '../../../background_scripts/note_storage.js';
 
 describe('note_storage.js', () => {
@@ -36,22 +43,24 @@ describe('note_storage.js', () => {
     mockLocalStorageData = {};
 
     mockStorageArea.get.mockImplementation(async (key) => {
-        const result = {};
-        if (key === 'timeoutNotes' && mockLocalStorageData.timeoutNotes) {
-            result.timeoutNotes = mockLocalStorageData.timeoutNotes;
-        }
-        return Promise.resolve(result);
-      });
-  
-      mockStorageArea.set.mockImplementation(async (items) => {
-        if (Object.prototype.hasOwnProperty.call(items, 'timeoutNotes')) {
-          mockLocalStorageData.timeoutNotes = items.timeoutNotes;
-        }
-        return Promise.resolve();
-      });
+      const result = {};
+      if (key === 'timeoutNotes' && mockLocalStorageData.timeoutNotes) {
+        result.timeoutNotes = mockLocalStorageData.timeoutNotes;
+      }
+      return Promise.resolve(result);
+    });
+
+    mockStorageArea.set.mockImplementation(async (items) => {
+      if (Object.prototype.hasOwnProperty.call(items, 'timeoutNotes')) {
+        mockLocalStorageData.timeoutNotes = items.timeoutNotes;
+      }
+      return Promise.resolve();
+    });
 
     let uuidCounter = 0;
-    mockCrypto.randomUUID.mockImplementation(() => `test-uuid-${++uuidCounter}`);
+    mockCrypto.randomUUID.mockImplementation(
+      () => `test-uuid-${++uuidCounter}`
+    );
 
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -85,7 +94,10 @@ describe('note_storage.js', () => {
       mockStorageArea.get.mockRejectedValueOnce(new Error('Storage failed'));
       const notes = await getTimeoutNotes();
       expect(notes).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error getting timeout notes:", expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error getting timeout notes:',
+        expect.any(Error)
+      );
     });
   });
 
@@ -98,9 +110,9 @@ describe('note_storage.js', () => {
     });
 
     it('should trim text for new note', async () => {
-        const noteObject = { text: '  Trimmed note  ' };
-        const addedNote = await addTimeoutNote(noteObject);
-        expect(addedNote.text).toBe('Trimmed note');
+      const noteObject = { text: '  Trimmed note  ' };
+      const addedNote = await addTimeoutNote(noteObject);
+      expect(addedNote.text).toBe('Trimmed note');
     });
 
     it('should return null and log error for invalid noteObject', async () => {
@@ -115,7 +127,10 @@ describe('note_storage.js', () => {
       const noteObject = { text: 'Fail note' };
       const result = await addTimeoutNote(noteObject);
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error adding timeout note:", expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error adding timeout note:',
+        expect.any(Error)
+      );
     });
   });
 
@@ -129,20 +144,32 @@ describe('note_storage.js', () => {
     it('should update an existing note', async () => {
       const updates = { text: 'Updated Note 1' };
       const updatedNote = await updateTimeoutNote('test-uuid-1', updates);
-      expect(updatedNote).toEqual({ id: 'test-uuid-1', text: 'Updated Note 1' });
+      expect(updatedNote).toEqual({
+        id: 'test-uuid-1',
+        text: 'Updated Note 1',
+      });
     });
 
     it('should return null if noteId is not found and log warn', async () => {
-      const result = await updateTimeoutNote('non-existent-id', { text: 'New text' });
+      const result = await updateTimeoutNote('non-existent-id', {
+        text: 'New text',
+      });
       expect(result).toBeNull();
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Note with ID "non-existent-id" not found for update.');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Note with ID "non-existent-id" not found for update.'
+      );
     });
 
     it('should return null on storage set error and log error', async () => {
       mockStorageArea.set.mockRejectedValueOnce(new Error('Set failed'));
-      const result = await updateTimeoutNote('test-uuid-1', { text: 'New Text' });
+      const result = await updateTimeoutNote('test-uuid-1', {
+        text: 'New Text',
+      });
       expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating timeout note with ID "test-uuid-1":', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error updating timeout note with ID "test-uuid-1":',
+        expect.any(Error)
+      );
     });
   });
 
@@ -157,20 +184,27 @@ describe('note_storage.js', () => {
     it('should delete an existing note and return true', async () => {
       const result = await deleteTimeoutNote('test-uuid-1');
       expect(result).toBe(true);
-      expect(mockLocalStorageData.timeoutNotes).toEqual([{ id: 'test-uuid-2', text: 'Note 2' }]);
+      expect(mockLocalStorageData.timeoutNotes).toEqual([
+        { id: 'test-uuid-2', text: 'Note 2' },
+      ]);
     });
 
     it('should return false if noteId is not found and log warn', async () => {
       const result = await deleteTimeoutNote('non-existent-id');
       expect(result).toBe(false);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Note with ID "non-existent-id" not found for deletion.');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Note with ID "non-existent-id" not found for deletion.'
+      );
     });
 
     it('should return false on storage set error and log error', async () => {
       mockStorageArea.set.mockRejectedValueOnce(new Error('Set failed'));
       const result = await deleteTimeoutNote('test-uuid-1');
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting timeout note with ID "test-uuid-1":', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error deleting timeout note with ID "test-uuid-1":',
+        expect.any(Error)
+      );
     });
   });
-}); 
+});

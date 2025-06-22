@@ -14,10 +14,10 @@
  */
 export async function getDistractingSites() {
   try {
-    const result = await browser.storage.local.get("distractingSites");
+    const result = await browser.storage.local.get('distractingSites');
     return result.distractingSites || [];
   } catch (error) {
-    console.error("Error getting distracting sites:", error);
+    console.error('Error getting distracting sites:', error);
     return [];
   }
 }
@@ -37,16 +37,30 @@ export async function getDistractingSites() {
  *                                 or null if validation fails or a storage error occurs.
  */
 export async function addDistractingSite(siteObject) {
-  if (!siteObject || typeof siteObject.urlPattern !== 'string' || siteObject.urlPattern.trim() === '' ||
-      typeof siteObject.dailyLimitSeconds !== 'number' || siteObject.dailyLimitSeconds <= 0) {
-    console.error("Invalid siteObject provided to addDistractingSite. 'urlPattern' (string) and 'dailyLimitSeconds' (positive number) are required.", siteObject);
+  if (
+    !siteObject ||
+    typeof siteObject.urlPattern !== 'string' ||
+    siteObject.urlPattern.trim() === '' ||
+    typeof siteObject.dailyLimitSeconds !== 'number' ||
+    siteObject.dailyLimitSeconds <= 0
+  ) {
+    console.error(
+      "Invalid siteObject provided to addDistractingSite. 'urlPattern' (string) and 'dailyLimitSeconds' (positive number) are required.",
+      siteObject
+    );
     return null;
   }
 
   // Validate dailyOpenLimit if provided
-  if (Object.prototype.hasOwnProperty.call(siteObject, 'dailyOpenLimit') && 
-      (typeof siteObject.dailyOpenLimit !== 'number' || siteObject.dailyOpenLimit <= 0)) {
-    console.error("Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.", siteObject.dailyOpenLimit);
+  if (
+    Object.prototype.hasOwnProperty.call(siteObject, 'dailyOpenLimit') &&
+    (typeof siteObject.dailyOpenLimit !== 'number' ||
+      siteObject.dailyOpenLimit <= 0)
+  ) {
+    console.error(
+      'Invalid dailyOpenLimit provided to addDistractingSite. Must be a positive number if specified.',
+      siteObject.dailyOpenLimit
+    );
     return null;
   }
 
@@ -54,7 +68,8 @@ export async function addDistractingSite(siteObject) {
     id: crypto.randomUUID(),
     urlPattern: siteObject.urlPattern.trim(),
     dailyLimitSeconds: siteObject.dailyLimitSeconds,
-    isEnabled: typeof siteObject.isEnabled === 'boolean' ? siteObject.isEnabled : true,
+    isEnabled:
+      typeof siteObject.isEnabled === 'boolean' ? siteObject.isEnabled : true,
   };
 
   // Add dailyOpenLimit if provided
@@ -68,7 +83,7 @@ export async function addDistractingSite(siteObject) {
     await browser.storage.local.set({ distractingSites: sites });
     return newSite;
   } catch (error) {
-    console.error("Error adding distracting site:", error);
+    console.error('Error adding distracting site:', error);
     return null;
   }
 }
@@ -90,35 +105,67 @@ export async function addDistractingSite(siteObject) {
  */
 export async function updateDistractingSite(siteId, updates) {
   if (!siteId || typeof siteId !== 'string') {
-    console.error("Invalid siteId provided to updateDistractingSite.");
+    console.error('Invalid siteId provided to updateDistractingSite.');
     return null;
   }
-  if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-    console.error("Invalid updates object provided to updateDistractingSite.", updates);
+  if (
+    !updates ||
+    typeof updates !== 'object' ||
+    Object.keys(updates).length === 0
+  ) {
+    console.error(
+      'Invalid updates object provided to updateDistractingSite.',
+      updates
+    );
     return null;
   }
 
   // Validate updates
-  if (Object.prototype.hasOwnProperty.call(updates, 'urlPattern') && (typeof updates.urlPattern !== 'string' || updates.urlPattern.trim() === '')) {
-    console.error("Invalid urlPattern in updates for updateDistractingSite.", updates.urlPattern);
+  if (
+    Object.prototype.hasOwnProperty.call(updates, 'urlPattern') &&
+    (typeof updates.urlPattern !== 'string' || updates.urlPattern.trim() === '')
+  ) {
+    console.error(
+      'Invalid urlPattern in updates for updateDistractingSite.',
+      updates.urlPattern
+    );
     return null;
   }
-  if (Object.prototype.hasOwnProperty.call(updates, 'dailyLimitSeconds') && (typeof updates.dailyLimitSeconds !== 'number' || updates.dailyLimitSeconds <= 0)) {
-    console.error("Invalid dailyLimitSeconds in updates for updateDistractingSite.", updates.dailyLimitSeconds);
+  if (
+    Object.prototype.hasOwnProperty.call(updates, 'dailyLimitSeconds') &&
+    (typeof updates.dailyLimitSeconds !== 'number' ||
+      updates.dailyLimitSeconds <= 0)
+  ) {
+    console.error(
+      'Invalid dailyLimitSeconds in updates for updateDistractingSite.',
+      updates.dailyLimitSeconds
+    );
     return null;
   }
-  if (Object.prototype.hasOwnProperty.call(updates, 'dailyOpenLimit') && (typeof updates.dailyOpenLimit !== 'number' || updates.dailyOpenLimit <= 0)) {
-    console.error("Invalid dailyOpenLimit in updates for updateDistractingSite.", updates.dailyOpenLimit);
+  if (
+    Object.prototype.hasOwnProperty.call(updates, 'dailyOpenLimit') &&
+    (typeof updates.dailyOpenLimit !== 'number' || updates.dailyOpenLimit <= 0)
+  ) {
+    console.error(
+      'Invalid dailyOpenLimit in updates for updateDistractingSite.',
+      updates.dailyOpenLimit
+    );
     return null;
   }
-  if (Object.prototype.hasOwnProperty.call(updates, 'isEnabled') && typeof updates.isEnabled !== 'boolean') {
-    console.error("Invalid isEnabled in updates for updateDistractingSite.", updates.isEnabled);
+  if (
+    Object.prototype.hasOwnProperty.call(updates, 'isEnabled') &&
+    typeof updates.isEnabled !== 'boolean'
+  ) {
+    console.error(
+      'Invalid isEnabled in updates for updateDistractingSite.',
+      updates.isEnabled
+    );
     return null;
   }
 
   try {
     const sites = await getDistractingSites();
-    const siteIndex = sites.findIndex(site => site.id === siteId);
+    const siteIndex = sites.findIndex((site) => site.id === siteId);
 
     if (siteIndex === -1) {
       console.warn(`Site with ID "${siteId}" not found for update.`);
@@ -127,12 +174,15 @@ export async function updateDistractingSite(siteId, updates) {
 
     // Create the updated site object by merging current site with validated updates
     const updatedSite = { ...sites[siteIndex], ...updates };
-    
+
     sites[siteIndex] = updatedSite;
     await browser.storage.local.set({ distractingSites: sites });
     return updatedSite;
   } catch (error) {
-    console.error(`Error updating distracting site with ID "${siteId}":`, error);
+    console.error(
+      `Error updating distracting site with ID "${siteId}":`,
+      error
+    );
     return null;
   }
 }
@@ -148,13 +198,13 @@ export async function updateDistractingSite(siteId, updates) {
  */
 export async function deleteDistractingSite(siteId) {
   if (!siteId || typeof siteId !== 'string') {
-    console.error("Invalid siteId provided to deleteDistractingSite.");
+    console.error('Invalid siteId provided to deleteDistractingSite.');
     return false;
   }
   try {
     let sites = await getDistractingSites();
     const initialLength = sites.length;
-    sites = sites.filter(site => site.id !== siteId);
+    sites = sites.filter((site) => site.id !== siteId);
 
     if (sites.length === initialLength) {
       console.warn(`Site with ID "${siteId}" not found for deletion.`);
@@ -164,7 +214,10 @@ export async function deleteDistractingSite(siteId) {
     await browser.storage.local.set({ distractingSites: sites });
     return true;
   } catch (error) {
-    console.error(`Error deleting distracting site with ID "${siteId}":`, error);
+    console.error(
+      `Error deleting distracting site with ID "${siteId}":`,
+      error
+    );
     return false;
   }
-} 
+}

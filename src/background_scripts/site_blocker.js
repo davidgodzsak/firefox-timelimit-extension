@@ -3,7 +3,7 @@
  * @description Manages the blocking of distracting sites when their daily time or open count limits are exceeded.
  * Works in conjunction with the usage_storage and site_storage modules to determine when to block.
  * Updated to support both time limits and open count limits.
- * 
+ *
  * This module is now event-driven and called directly from background.js navigation events.
  * It operates statelessly, retrieving all necessary data from chrome.storage on each call.
  */
@@ -36,7 +36,7 @@ function _getCurrentDateString() {
 function _generateBlockingReason(site, siteStats, timeExceeded, opensExceeded) {
   const timeSpentMinutes = Math.round(siteStats.timeSpentSeconds / 60);
   const limitMinutes = Math.round(site.dailyLimitSeconds / 60);
-  
+
   if (timeExceeded && opensExceeded) {
     return `You've exceeded both your time limit (${timeSpentMinutes}/${limitMinutes} minutes) and open limit (${siteStats.opens}/${site.dailyOpenLimit} opens) for this site today.`;
   } else if (timeExceeded) {
@@ -44,15 +44,15 @@ function _generateBlockingReason(site, siteStats, timeExceeded, opensExceeded) {
   } else if (opensExceeded) {
     return `You've opened this site ${siteStats.opens} times today, exceeding your ${site.dailyOpenLimit} open limit.`;
   }
-  
-  return "Daily limit exceeded for this site.";
+
+  return 'Daily limit exceeded for this site.';
 }
 
 /**
  * Checks if a site should be blocked based on its daily limits and current usage.
  * Now supports both time limits and open count limits.
  * This function is stateless and suitable for event-driven architecture.
- * 
+ *
  * @param {string|number} tabId - The ID of the tab to check (from navigation event)
  * @param {string} url - The URL to check (from navigation event)
  * @returns {Promise<{shouldBlock: boolean, siteId: string|null, reason: string|null, limitType: string|null}>} Object containing:
@@ -64,7 +64,10 @@ function _generateBlockingReason(site, siteStats, timeExceeded, opensExceeded) {
 export async function checkAndBlockSite(tabId, url) {
   // Enhanced validation for navigation event parameters
   if (!tabId || !url || typeof url !== 'string') {
-    console.warn('[SiteBlocker] Invalid parameters provided to checkAndBlockSite:', { tabId, url });
+    console.warn(
+      '[SiteBlocker] Invalid parameters provided to checkAndBlockSite:',
+      { tabId, url }
+    );
     return { shouldBlock: false, siteId: null, reason: null, limitType: null };
   }
 
@@ -73,10 +76,12 @@ export async function checkAndBlockSite(tabId, url) {
   try {
     // Get all distracting sites
     const distractingSites = await getDistractingSites();
-    console.log(`[SiteBlocker] Retrieved ${distractingSites.length} distracting sites from storage`);
-    
+    console.log(
+      `[SiteBlocker] Retrieved ${distractingSites.length} distracting sites from storage`
+    );
+
     // Find a matching site that is enabled
-    const matchingSite = distractingSites.find(site => {
+    const matchingSite = distractingSites.find((site) => {
       if (!site.isEnabled) {
         console.log(`[SiteBlocker] Skipping disabled site: ${site.urlPattern}`);
         return false;
@@ -86,51 +91,71 @@ export async function checkAndBlockSite(tabId, url) {
         const hostname = urlObj.hostname;
         // FIXED: Check if hostname contains the pattern, not the other way around
         const isMatch = hostname.includes(site.urlPattern);
-        console.log(`[SiteBlocker] Checking pattern '${site.urlPattern}' against hostname '${hostname}': ${isMatch ? 'MATCH' : 'no match'}`);
+        console.log(
+          `[SiteBlocker] Checking pattern '${site.urlPattern}' against hostname '${hostname}': ${isMatch ? 'MATCH' : 'no match'}`
+        );
         return isMatch;
       } catch (error) {
-        console.warn(`[SiteBlocker] Error parsing URL '${url}':`, error.message);
+        console.warn(
+          `[SiteBlocker] Error parsing URL '${url}':`,
+          error.message
+        );
         return false;
       }
     });
 
     if (!matchingSite) {
-      console.log(`[SiteBlocker] No matching distracting site found for ${url}`);
-      return { shouldBlock: false, siteId: null, reason: null, limitType: null };
+      console.log(
+        `[SiteBlocker] No matching distracting site found for ${url}`
+      );
+      return {
+        shouldBlock: false,
+        siteId: null,
+        reason: null,
+        limitType: null,
+      };
     }
 
-    console.log(`[SiteBlocker] Found matching site: ${matchingSite.urlPattern} (ID: ${matchingSite.id})`);
+    console.log(
+      `[SiteBlocker] Found matching site: ${matchingSite.urlPattern} (ID: ${matchingSite.id})`
+    );
 
     // Get today's usage stats
     const dateString = _getCurrentDateString();
     console.log(`[SiteBlocker] Getting usage stats for date: ${dateString}`);
     const dailyStats = await getUsageStats(dateString);
-    const siteStats = dailyStats[matchingSite.id] || { timeSpentSeconds: 0, opens: 0 };
-    
+    const siteStats = dailyStats[matchingSite.id] || {
+      timeSpentSeconds: 0,
+      opens: 0,
+    };
+
     console.log(`[SiteBlocker] Current usage for site ${matchingSite.id}:`, {
       timeSpentSeconds: siteStats.timeSpentSeconds,
       opens: siteStats.opens,
-      timeSpentMinutes: Math.round(siteStats.timeSpentSeconds / 60)
+      timeSpentMinutes: Math.round(siteStats.timeSpentSeconds / 60),
     });
-    
+
     console.log(`[SiteBlocker] Site limits:`, {
       dailyLimitSeconds: matchingSite.dailyLimitSeconds,
       dailyLimitMinutes: Math.round(matchingSite.dailyLimitSeconds / 60),
-      dailyOpenLimit: matchingSite.dailyOpenLimit
+      dailyOpenLimit: matchingSite.dailyOpenLimit,
     });
 
     // Check both time and open limits
     const hasTimeLimit = matchingSite.dailyLimitSeconds > 0;
     const hasOpenLimit = matchingSite.dailyOpenLimit > 0;
-    
-    const timeExceeded = hasTimeLimit && siteStats.timeSpentSeconds >= matchingSite.dailyLimitSeconds;
-    const opensExceeded = hasOpenLimit && siteStats.opens >= matchingSite.dailyOpenLimit;
+
+    const timeExceeded =
+      hasTimeLimit &&
+      siteStats.timeSpentSeconds >= matchingSite.dailyLimitSeconds;
+    const opensExceeded =
+      hasOpenLimit && siteStats.opens >= matchingSite.dailyOpenLimit;
 
     console.log(`[SiteBlocker] Limit check results:`, {
       hasTimeLimit,
       hasOpenLimit,
       timeExceeded,
-      opensExceeded
+      opensExceeded,
     });
 
     // Block if any limit is exceeded
@@ -143,21 +168,35 @@ export async function checkAndBlockSite(tabId, url) {
       } else if (opensExceeded) {
         limitType = 'opens';
       }
-      
-      const reason = _generateBlockingReason(matchingSite, siteStats, timeExceeded, opensExceeded);
-      
-      console.log(`[SiteBlocker] BLOCKING site ${matchingSite.id} due to ${limitType} limit. Reason: ${reason}`);
-      
+
+      const reason = _generateBlockingReason(
+        matchingSite,
+        siteStats,
+        timeExceeded,
+        opensExceeded
+      );
+
+      console.log(
+        `[SiteBlocker] BLOCKING site ${matchingSite.id} due to ${limitType} limit. Reason: ${reason}`
+      );
+
       return {
         shouldBlock: true,
         siteId: matchingSite.id,
         reason: reason,
-        limitType: limitType
+        limitType: limitType,
       };
     }
 
-    console.log(`[SiteBlocker] Site ${matchingSite.id} is within limits, allowing access`);
-    return { shouldBlock: false, siteId: matchingSite.id, reason: null, limitType: null };
+    console.log(
+      `[SiteBlocker] Site ${matchingSite.id} is within limits, allowing access`
+    );
+    return {
+      shouldBlock: false,
+      siteId: matchingSite.id,
+      reason: null,
+      limitType: null,
+    };
   } catch (error) {
     console.error('[SiteBlocker] Error checking site block status:', error);
     // On error, don't block to avoid accidentally restricting access
@@ -183,15 +222,18 @@ export async function checkOpenLimitBeforeAccess(url) {
   try {
     // Get all distracting sites
     const distractingSites = await getDistractingSites();
-    
+
     // Find a matching site that is enabled and has an open limit
-    const matchingSite = distractingSites.find(site => {
+    const matchingSite = distractingSites.find((site) => {
       if (!site.isEnabled || !site.dailyOpenLimit) return false;
       try {
         const urlObj = new URL(url);
         return urlObj.hostname.includes(site.urlPattern);
       } catch (error) {
-        console.warn(`[SiteBlocker] Error parsing URL '${url}':`, error.message);
+        console.warn(
+          `[SiteBlocker] Error parsing URL '${url}':`,
+          error.message
+        );
         return false;
       }
     });
@@ -203,19 +245,25 @@ export async function checkOpenLimitBeforeAccess(url) {
     // Get today's usage stats
     const dateString = _getCurrentDateString();
     const dailyStats = await getUsageStats(dateString);
-    const siteStats = dailyStats[matchingSite.id] || { timeSpentSeconds: 0, opens: 0 };
+    const siteStats = dailyStats[matchingSite.id] || {
+      timeSpentSeconds: 0,
+      opens: 0,
+    };
 
     // Check if we would exceed the open limit with one more open
-    const wouldExceed = (siteStats.opens + 1) > matchingSite.dailyOpenLimit;
+    const wouldExceed = siteStats.opens + 1 > matchingSite.dailyOpenLimit;
 
     return {
       wouldExceed: wouldExceed,
       siteId: matchingSite.id,
       currentOpens: siteStats.opens,
-      limit: matchingSite.dailyOpenLimit
+      limit: matchingSite.dailyOpenLimit,
     };
   } catch (error) {
-    console.error('[SiteBlocker] Error checking open limit before access:', error);
+    console.error(
+      '[SiteBlocker] Error checking open limit before access:',
+      error
+    );
     return { wouldExceed: false, siteId: null, currentOpens: 0, limit: 0 };
   }
 }
@@ -224,34 +272,47 @@ export async function checkOpenLimitBeforeAccess(url) {
  * Redirects a tab to the timeout page if the site should be blocked.
  * This is the main entry point called by the event-driven background script.
  * It checks blocking status and performs redirection if necessary.
- * 
+ *
  * @param {string|number} tabId - The ID of the tab to potentially redirect (from navigation event)
  * @param {string} url - The URL being accessed (from navigation event)
  * @returns {Promise<boolean>} Whether the tab was redirected
  */
 export async function handlePotentialRedirect(tabId, url) {
-  console.log(`[SiteBlocker] handlePotentialRedirect called for tab ${tabId}, URL: ${url}`);
-  
+  console.log(
+    `[SiteBlocker] handlePotentialRedirect called for tab ${tabId}, URL: ${url}`
+  );
+
   try {
-    const { shouldBlock, siteId, reason, limitType } = await checkAndBlockSite(tabId, url);
-    
+    const { shouldBlock, siteId, reason, limitType } = await checkAndBlockSite(
+      tabId,
+      url
+    );
+
     if (shouldBlock && siteId) {
-      console.log(`[SiteBlocker] Redirecting tab ${tabId} to timeout page. Reason: ${reason}`);
-      
+      console.log(
+        `[SiteBlocker] Redirecting tab ${tabId} to timeout page. Reason: ${reason}`
+      );
+
       // Construct timeout page URL with query parameters
-      const timeoutUrl = browser.runtime.getURL('ui/timeout/timeout.html') + 
-                        `?blockedUrl=${encodeURIComponent(url)}&siteId=${encodeURIComponent(siteId)}&reason=${encodeURIComponent(reason)}&limitType=${encodeURIComponent(limitType)}`;
-      
+      const timeoutUrl =
+        browser.runtime.getURL('ui/timeout/timeout.html') +
+        `?blockedUrl=${encodeURIComponent(url)}&siteId=${encodeURIComponent(siteId)}&reason=${encodeURIComponent(reason)}&limitType=${encodeURIComponent(limitType)}`;
+
       // Perform the redirect
       await browser.tabs.update(tabId, { url: timeoutUrl });
-      console.log(`[SiteBlocker] Successfully redirected tab ${tabId} to timeout page`);
+      console.log(
+        `[SiteBlocker] Successfully redirected tab ${tabId} to timeout page`
+      );
       return true;
     }
-    
+
     console.log(`[SiteBlocker] No redirection needed for tab ${tabId}`);
     return false;
   } catch (error) {
-    console.error(`[SiteBlocker] Error in handlePotentialRedirect for tab ${tabId}:`, error);
+    console.error(
+      `[SiteBlocker] Error in handlePotentialRedirect for tab ${tabId}:`,
+      error
+    );
     return false;
   }
-} 
+}

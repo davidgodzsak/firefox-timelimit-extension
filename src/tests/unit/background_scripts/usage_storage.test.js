@@ -1,4 +1,11 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
 /**
  * @file usage_storage.test.js
@@ -28,17 +35,17 @@ describe('usage_storage.js', () => {
     mockLocalStorageData = {};
 
     mockStorageArea.get.mockImplementation(async (key) => {
-        const result = {};
-        if (Object.prototype.hasOwnProperty.call(mockLocalStorageData, key)) {
-          result[key] = mockLocalStorageData[key];
-        }
-        return Promise.resolve(result);
-      });
-  
-      mockStorageArea.set.mockImplementation(async (items) => {
-        Object.assign(mockLocalStorageData, items);
-        return Promise.resolve();
-      });
+      const result = {};
+      if (Object.prototype.hasOwnProperty.call(mockLocalStorageData, key)) {
+        result[key] = mockLocalStorageData[key];
+      }
+      return Promise.resolve(result);
+    });
+
+    mockStorageArea.set.mockImplementation(async (items) => {
+      Object.assign(mockLocalStorageData, items);
+      return Promise.resolve();
+    });
 
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -68,7 +75,10 @@ describe('usage_storage.js', () => {
       mockStorageArea.get.mockRejectedValueOnce(new Error('Storage failed'));
       const stats = await getUsageStats('2023-01-01');
       expect(stats).toEqual({});
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Error getting usage stats for date 2023-01-01:", expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error getting usage stats for date 2023-01-01:',
+        expect.any(Error)
+      );
     });
   });
 
@@ -85,13 +95,13 @@ describe('usage_storage.js', () => {
     });
 
     it('should update existing entry', async () => {
-        mockLocalStorageData[storageKey] = {
-            [siteId]: { timeSpentSeconds: 50, opens: 2 },
-        };
-        const usageData = { timeSpentSeconds: 150, opens: 3 };
-        const result = await updateUsageStats(dateString, siteId, usageData);
-        expect(result).toBe(true);
-        expect(mockLocalStorageData[storageKey][siteId]).toEqual(usageData);
+      mockLocalStorageData[storageKey] = {
+        [siteId]: { timeSpentSeconds: 50, opens: 2 },
+      };
+      const usageData = { timeSpentSeconds: 150, opens: 3 };
+      const result = await updateUsageStats(dateString, siteId, usageData);
+      expect(result).toBe(true);
+      expect(mockLocalStorageData[storageKey][siteId]).toEqual(usageData);
     });
 
     it('should return false on storage set error and log error', async () => {
@@ -99,7 +109,10 @@ describe('usage_storage.js', () => {
       const usageData = { timeSpentSeconds: 10, opens: 1 };
       const result = await updateUsageStats(dateString, siteId, usageData);
       expect(result).toBe(false);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(`Error updating usage stats for site ${siteId} on date ${dateString}:`, expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error updating usage stats for site ${siteId} on date ${dateString}:`,
+        expect.any(Error)
+      );
     });
   });
-}); 
+});
