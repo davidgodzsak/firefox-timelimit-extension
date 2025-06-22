@@ -198,9 +198,12 @@ export function getIcon(iconName, size = null) {
  */
 export function createIconElement(iconName, options = {}) {
   const { size, className = '', title = '' } = options;
-  const div = document.createElement('div');
-  div.innerHTML = getIcon(iconName, size);
-  const svg = div.firstElementChild;
+  
+  // Use safe DOM manipulation instead of innerHTML
+  const iconSvg = getIcon(iconName, size);
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(iconSvg, 'image/svg+xml');
+  const svg = doc.documentElement.cloneNode(true);
 
   if (className) {
     svg.classList.add(...className.split(' '));

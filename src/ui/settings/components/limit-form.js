@@ -46,40 +46,125 @@ export class LimitForm {
    * @private
    */
   createFormStructure() {
-    this.container.innerHTML = `
-      <div class="limit-form-header">
-        <div class="site-info">
-          <h4 class="site-url">${this.escapeHtml(this.siteData.urlPattern)}</h4>
-        </div>
-        <div class="form-actions">
-          <!-- QA FIX: Replace redundant badge + button with single toggle switch -->
-          <label class="toggle-switch" title="${this.siteData.isEnabled ? 'Disable' : 'Enable'} site">
-            <input type="checkbox" class="toggle-site-checkbox" ${this.siteData.isEnabled ? 'checked' : ''}>
-            <span class="toggle-slider"></span>
-            <span class="toggle-label">${this.siteData.isEnabled ? 'Enabled' : 'Disabled'}</span>
-          </label>
-          <button class="btn btn-danger btn-small delete-site-btn" type="button" title="Delete site">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3,6 5,6 21,6"/>
-              <path d="m19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"/>
-              <line x1="10" y1="11" x2="10" y2="17"/>
-              <line x1="14" y1="11" x2="14" y2="17"/>
-            </svg>
-            Delete
-          </button>
-        </div>
-      </div>
-      <div class="limit-form-body">
-        <div class="limit-row">
-          <label class="limit-label">Time Limit:</label>
-          <div class="limit-editor" id="time-limit-editor"></div>
-        </div>
-        <div class="limit-row">
-          <label class="limit-label">Open Limit:</label>
-          <div class="limit-editor" id="open-limit-editor"></div>
-        </div>
-      </div>
-    `;
+    // Create elements safely using DOM methods
+    const formHeader = document.createElement('div');
+    formHeader.className = 'limit-form-header';
+
+    const siteInfo = document.createElement('div');
+    siteInfo.className = 'site-info';
+    
+    const siteUrl = document.createElement('h4');
+    siteUrl.className = 'site-url';
+    siteUrl.textContent = this.siteData.urlPattern;
+    siteInfo.appendChild(siteUrl);
+
+    const formActions = document.createElement('div');
+    formActions.className = 'form-actions';
+
+    // Create toggle switch
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'toggle-switch';
+    toggleLabel.title = this.siteData.isEnabled ? 'Disable site' : 'Enable site';
+
+    const toggleCheckbox = document.createElement('input');
+    toggleCheckbox.type = 'checkbox';
+    toggleCheckbox.className = 'toggle-site-checkbox';
+    toggleCheckbox.checked = this.siteData.isEnabled;
+
+    const toggleSlider = document.createElement('span');
+    toggleSlider.className = 'toggle-slider';
+
+    const toggleLabelText = document.createElement('span');
+    toggleLabelText.className = 'toggle-label';
+    toggleLabelText.textContent = this.siteData.isEnabled ? 'Enabled' : 'Disabled';
+
+    toggleLabel.appendChild(toggleCheckbox);
+    toggleLabel.appendChild(toggleSlider);
+    toggleLabel.appendChild(toggleLabelText);
+
+    // Create delete button with SVG
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-danger btn-small delete-site-btn';
+    deleteBtn.type = 'button';
+    deleteBtn.title = 'Delete site';
+
+    const deleteSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    deleteSvg.setAttribute('width', '14');
+    deleteSvg.setAttribute('height', '14');
+    deleteSvg.setAttribute('viewBox', '0 0 24 24');
+    deleteSvg.setAttribute('fill', 'none');
+    deleteSvg.setAttribute('stroke', 'currentColor');
+    deleteSvg.setAttribute('stroke-width', '2');
+
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '3,6 5,6 21,6');
+    deleteSvg.appendChild(polyline);
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'm19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2');
+    deleteSvg.appendChild(path);
+
+    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line1.setAttribute('x1', '10');
+    line1.setAttribute('y1', '11');
+    line1.setAttribute('x2', '10');
+    line1.setAttribute('y2', '17');
+    deleteSvg.appendChild(line1);
+
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line2.setAttribute('x1', '14');
+    line2.setAttribute('y1', '11');
+    line2.setAttribute('x2', '14');
+    line2.setAttribute('y2', '17');
+    deleteSvg.appendChild(line2);
+
+    deleteBtn.appendChild(deleteSvg);
+    deleteBtn.appendChild(document.createTextNode(' Delete'));
+
+    formActions.appendChild(toggleLabel);
+    formActions.appendChild(deleteBtn);
+
+    formHeader.appendChild(siteInfo);
+    formHeader.appendChild(formActions);
+
+    // Create form body
+    const formBody = document.createElement('div');
+    formBody.className = 'limit-form-body';
+
+    const timeLimitRow = document.createElement('div');
+    timeLimitRow.className = 'limit-row';
+    
+    const timeLimitLabel = document.createElement('label');
+    timeLimitLabel.className = 'limit-label';
+    timeLimitLabel.textContent = 'Time Limit:';
+    
+    const timeLimitEditor = document.createElement('div');
+    timeLimitEditor.className = 'limit-editor';
+    timeLimitEditor.id = 'time-limit-editor';
+
+    timeLimitRow.appendChild(timeLimitLabel);
+    timeLimitRow.appendChild(timeLimitEditor);
+
+    const openLimitRow = document.createElement('div');
+    openLimitRow.className = 'limit-row';
+    
+    const openLimitLabel = document.createElement('label');
+    openLimitLabel.className = 'limit-label';
+    openLimitLabel.textContent = 'Open Limit:';
+    
+    const openLimitEditor = document.createElement('div');
+    openLimitEditor.className = 'limit-editor';
+    openLimitEditor.id = 'open-limit-editor';
+
+    openLimitRow.appendChild(openLimitLabel);
+    openLimitRow.appendChild(openLimitEditor);
+
+    formBody.appendChild(timeLimitRow);
+    formBody.appendChild(openLimitRow);
+
+    // Append to container
+    this.container.appendChild(formHeader);
+    this.container.appendChild(formBody);
 
     // Get element references
     this.elements.toggleCheckbox = this.container.querySelector(

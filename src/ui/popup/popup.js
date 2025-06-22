@@ -401,10 +401,17 @@ function displayExistingLimits(siteInfo) {
 
     // Update time limit display
     if (elements.timeLimitDisplay) {
-      elements.timeLimitDisplay.innerHTML = `
-        <span>Daily Time Limit:</span>
-        <strong>${limitMinutes} minute${limitMinutes !== 1 ? 's' : ''}</strong>
-      `;
+      // Clear existing content
+      elements.timeLimitDisplay.textContent = '';
+      
+      const span = document.createElement('span');
+      span.textContent = 'Daily Time Limit:';
+      
+      const strong = document.createElement('strong');
+      strong.textContent = `${limitMinutes} minute${limitMinutes !== 1 ? 's' : ''}`;
+      
+      elements.timeLimitDisplay.appendChild(span);
+      elements.timeLimitDisplay.appendChild(strong);
       elements.timeLimitDisplay.style.display = 'flex';
     }
 
@@ -448,10 +455,17 @@ function displayExistingLimits(siteInfo) {
 
     // Update open limit display
     if (elements.openLimitDisplay) {
-      elements.openLimitDisplay.innerHTML = `
-        <span>Daily Open Limit:</span>
-        <strong>${siteInfo.dailyOpenLimit} open${siteInfo.dailyOpenLimit !== 1 ? 's' : ''}</strong>
-      `;
+      // Clear existing content
+      elements.openLimitDisplay.textContent = '';
+      
+      const span = document.createElement('span');
+      span.textContent = 'Daily Open Limit:';
+      
+      const strong = document.createElement('strong');
+      strong.textContent = `${siteInfo.dailyOpenLimit} open${siteInfo.dailyOpenLimit !== 1 ? 's' : ''}`;
+      
+      elements.openLimitDisplay.appendChild(span);
+      elements.openLimitDisplay.appendChild(strong);
       elements.openLimitDisplay.style.display = 'flex';
     }
 
@@ -495,24 +509,66 @@ function displayExistingLimits(siteInfo) {
 function setupNewSiteForm(hostname) {
   // QA FIX: Update form title to show the specific site name being configured
   if (elements.formTitle) {
-    elements.formTitle.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="16"/>
-        <line x1="8" y1="12" x2="16" y2="12"/>
-      </svg>
-      Add Limits for ${hostname || 'This Site'}
-    `;
+    // Clear existing content
+    elements.formTitle.textContent = '';
+    
+    // Create SVG element
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '20');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '12');
+    circle.setAttribute('cy', '12');
+    circle.setAttribute('r', '10');
+    svg.appendChild(circle);
+
+    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line1.setAttribute('x1', '12');
+    line1.setAttribute('y1', '8');
+    line1.setAttribute('x2', '12');
+    line1.setAttribute('y2', '16');
+    svg.appendChild(line1);
+
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line2.setAttribute('x1', '8');
+    line2.setAttribute('y1', '12');
+    line2.setAttribute('x2', '16');
+    line2.setAttribute('y2', '12');
+    svg.appendChild(line2);
+
+    elements.formTitle.appendChild(svg);
+    elements.formTitle.appendChild(document.createTextNode(` Add Limits for ${hostname || 'This Site'}`));
   }
 
   // Update submit button with icon
   if (elements.submitBtn) {
-    elements.submitBtn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20,6 9,17 4,12"/>
-      </svg>
-      Add Limits
-    `;
+    // Clear existing content
+    elements.submitBtn.textContent = '';
+    
+    // Create SVG element
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '14');
+    svg.setAttribute('height', '14');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '20,6 9,17 4,12');
+    svg.appendChild(polyline);
+
+    elements.submitBtn.appendChild(svg);
+    elements.submitBtn.appendChild(document.createTextNode(' Add Limits'));
   }
 
   // QA FIX: Store hostname for form submission (no longer pre-filling input)
