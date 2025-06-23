@@ -29,7 +29,6 @@ function _getHostnameFromUrl(urlString) {
     return url.hostname;
   } catch {
     // Log quietly as this can happen with temporary/internal URLs
-    // console.warn(`[DistractionDetector] Error parsing URL '${urlString}':`, error.message);
     return null;
   }
 }
@@ -131,5 +130,3 @@ export function checkIfUrlIsDistracting(url) {
   }
   return { isMatch: false, siteId: null, matchingPattern: null };
 }
-
-// Assume initializeDistractionDetector will be called by time_tracker.js orchestrator.

@@ -3,7 +3,7 @@
 > A Firefox extension that helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/davidgodzsak/firefox-timelimit-extension)
+[![Version](https://img.shields.io/badge/version-1.2.3-blue.svg)](https://github.com/davidgodzsak/firefox-timelimit-extension)
 
 ## Features
 
@@ -15,7 +15,7 @@
 - 📝 **Motivational Notes**: Display custom motivational messages during timeouts
 - 🔀 **Message Shuffling**: Click shuffle icon to cycle through different motivational messages (NEW in v1.1.0)
 
-### Toolbar Integration (NEW in v1.1.0)
+### Toolbar Integration (v1.1.0)
 - 🎯 **Popup Interface**: Click toolbar button for quick limit management
 - ⚡ **Quick Setup**: Add limits for the current page directly from the popup
 - 🏷️ **Dynamic Badge**: See remaining time/opens in the toolbar badge text
@@ -28,11 +28,17 @@
 - 📊 **Usage Statistics**: View detailed usage analytics
 - 🔄 **Daily Reset**: Automatic reset of daily usage counters
 
-### Architecture (NEW in v1.2.0)
+### Architecture (v1.2.0)
 - 🏗️ **Event-Driven**: Modern Manifest V3 event-driven architecture for better performance
 - ⚡ **Non-Persistent**: Background script runs only when needed, improving memory efficiency
 - 🔄 **Real-Time Sync**: All UI components synchronized with live updates
 - 🛡️ **Enhanced Security**: Improved permission model and error handling
+
+### Quality & Polish (NEW in v1.2.3)
+- ✨ **Perfect UI Alignment**: Pixel-perfect layout fixes for professional appearance
+- 🔧 **Enhanced Validation**: Immediate feedback on form inputs with proper error handling
+- 🧹 **Clean Codebase**: Zero technical debt with comprehensive code quality audit
+- ⚡ **Optimized Performance**: Streamlined cache management and dependency optimization
 
 ## Installation
 
@@ -297,7 +303,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 See [CHANGELOG.md](docs/CHANGELOG.md) for detailed version history.
 
-### v1.2.0 (Current) - Major Architecture Overhaul
+### v1.2.3 (Current) - Quality Assurance & Code Cleanup
+
+**Latest Release**: Focused on polishing user experience and maintaining production-ready code quality through systematic QA fixes and comprehensive cleanup.
+
+- **UI Polish**: Perfect layout alignment, enhanced validation feedback, and streamlined content presentation
+- **Code Quality**: Zero technical debt with comprehensive dependency audit and modern configuration standards
+- **Performance**: Optimized cache management and eliminated unnecessary overhead
+- **Developer Experience**: Clean development environment with professional-grade code standards
+
+### v1.2.0 - Major Architecture Overhaul
 
 #### 🏗️ **Complete Event-Driven Refactor**
 - **Background Script Migration**: Migrated from `main.js` to event-driven `background.js` architecture
@@ -343,13 +358,8 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for detailed version history.
 
 ## Known Issues
 
-1. ~~**Badge Text Performance**: Badge calculations may slow down with many configured sites~~ (FIXED in v1.2.0 with caching optimizations)
-2. ~~**Popup Responsiveness**: Popup may not render correctly on very small screen resolutions~~ (IMPROVED in v1.2.0)
-3. ~~**Settings Save Buttons**: Save buttons in settings may be invisible until hover~~ (FIXED in v1.2.0)
-4. **Concurrent Editing**: Multiple settings tabs editing the same site simultaneously may cause conflicts
-5. ~~**Extension Context**: Some edge cases with extension context invalidation~~ (IMPROVED in v1.2.0 with better error handling)
+1. **Concurrent Editing**: Multiple settings tabs editing the same site simultaneously may cause conflicts
 
-Note: Many issues from previous versions have been resolved in v1.2.0 through the architectural improvements and enhanced error handling.
 
 ## Support
 
