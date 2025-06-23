@@ -59,6 +59,18 @@
   color: var(--text-inverse);
 }
 
+/* QA FIX: Remove background when using actual icon image */
+.header-icon.header-icon-image {
+  background: none;
+  width: 48px;
+  height: 48px;
+}
+
+.header-icon.header-icon-image img {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
 .settings-title {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
@@ -138,20 +150,21 @@
   flex-wrap: wrap;
 }
 
-/* Ensure notes form has proper alignment */
-#add-note-form .form-row {
-  align-items: stretch;
-}
-
-#add-note-form .form-group.flex-grow {
+/* QA FIX: Perfect horizontal alignment for input and button using flexbox */
+.input-button-row {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  gap: var(--spacing-3);
+  align-items: center; /* Centers both input and button on the same baseline */
+  width: 100%; /* Ensure container spans full width */
 }
 
-#add-note-form .btn {
-  height: fit-content;
-  align-self: flex-end;
+.input-button-row .form-input {
+  flex: 1; /* Input takes remaining space */
+}
+
+.input-button-row .btn {
+  flex-shrink: 0; /* Button maintains its size */
+  height: fit-content; /* Button height matches its content */
 }
 
 .form-group {
@@ -159,6 +172,27 @@
   flex-direction: column;
   gap: var(--spacing-2);
   min-width: 200px;
+}
+
+/* QA FIX: For motivational notes, ensure form group takes full width */
+#add-note-form .form-group {
+  min-width: auto;
+  width: 100%;
+}
+
+/* QA FIX: Ensure the entire add-note-form structure takes full width */
+#add-note-form {
+  width: 100%;
+}
+
+#add-note-form .add-form {
+  width: 100%;
+}
+
+/* QA FIX: Override any inherited constraints for the input-button row */
+#add-note-form .input-button-row {
+  width: 100% !important;
+  box-sizing: border-box;
 }
 
 .form-group.flex-grow {
@@ -689,6 +723,7 @@
   transition: all var(--transition-fast);
 }
 
+/* Edit button (pencil icon) appears on hover of display mode */
 .inline-editor-edit-btn {
   display: flex;
   align-items: center;
@@ -702,7 +737,7 @@
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
-  opacity: 0;
+  opacity: 0; /* Hidden by default, shown on hover */
 }
 
 .inline-editor-display:hover .inline-editor-edit-btn {
@@ -755,11 +790,24 @@
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
+/* QA FIX: Ensure edit mode buttons are always visible and properly positioned */
 .inline-editor-buttons {
   display: flex !important;
   gap: var(--spacing-2);
   align-items: center;
   flex-shrink: 0; /* Prevent buttons from shrinking */
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* QA FIX: Override any hover-only visibility for edit mode buttons */
+.inline-editor.editing .inline-editor-buttons {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.inline-editor.editing .inline-editor-save-btn,
+.inline-editor.editing .inline-editor-cancel-btn {
   visibility: visible !important;
   opacity: 1 !important;
 }
@@ -778,33 +826,38 @@
   transition: all var(--transition-fast);
 }
 
+/* QA FIX: Save button - muted style with white background, success on hover */
 .inline-editor-save-btn {
-  background: var(--success-color);
-  color: white;
-  border-color: var(--success-color);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
 }
 
 .inline-editor-save-btn:hover:not(:disabled) {
-  background: var(--success-color-hover, #16a34a);
-  border-color: var(--success-color-hover, #16a34a);
+  background: var(--color-success, #16a34a);
+  color: var(--text-inverse);
+  border-color: var(--color-success, #16a34a);
 }
 
 .inline-editor-save-btn:disabled {
-  background: var(--text-muted);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
   border-color: var(--text-muted);
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
+/* QA FIX: Cancel button - muted style with white background, error on hover */
 .inline-editor-cancel-btn {
   background: var(--bg-secondary);
   color: var(--text-muted);
+  border-color: var(--text-muted);
 }
 
 .inline-editor-cancel-btn:hover {
-  background: var(--error-color);
-  color: white;
-  border-color: var(--error-color);
+  background: var(--color-error, #dc2626);
+  color: var(--text-inverse);
+  border-color: var(--color-error, #dc2626);
 }
 
 .inline-editor-error {

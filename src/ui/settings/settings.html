@@ -11,9 +11,9 @@
 <body>
     <div class="container">
         <header class="settings-header">
-            <div class="header-icon">
+            <div class="header-icon header-icon-image">
                 <!-- QA FIX: Use app icon from assets/icons instead of generic settings icon -->
-                <img src="../assets/icons/icon-48.png" width="40" height="40" alt="Distraction Limiter Icon">
+                <img src="../../assets/icons/icon-48.png" width="48" height="48" alt="Distraction Limiter Icon">
             </div>
             <h1 class="settings-title">Firefox Distraction Limiter</h1>
             <p class="settings-subtitle">Manage your distracting sites and motivational notes</p>
@@ -124,9 +124,10 @@
 
                 <div class="add-form-container">
                     <form class="add-form" id="add-note-form" aria-label="Add new motivational note">
-                        <div class="form-row">
-                            <div class="form-group flex-grow">
-                                <label for="note-text" class="form-label">Activity Suggestion</label>
+                        <div class="form-group">
+                            <label for="note-text" class="form-label">Activity Suggestion</label>
+                            <!-- QA FIX: Put input and button in same container with flexbox for perfect alignment -->
+                            <div class="input-button-row">
                                 <input 
                                     type="text" 
                                     id="note-text" 
@@ -137,16 +138,16 @@
                                     maxlength="200"
                                     required
                                 >
-                                <small id="note-text-help" class="form-help">Suggest something positive to do instead</small>
+                                <button type="submit" class="btn btn-primary" aria-label="Add note">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="12" y1="8" x2="12" y2="16"/>
+                                        <line x1="8" y1="12" x2="16" y2="12"/>
+                                    </svg>
+                                    Add Note
+                                </button>
                             </div>
-                            <button type="submit" class="btn btn-primary" aria-label="Add note">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <line x1="12" y1="8" x2="12" y2="16"/>
-                                    <line x1="8" y1="12" x2="16" y2="12"/>
-                                </svg>
-                                Add Note
-                            </button>
+                            <small id="note-text-help" class="form-help">Suggest something positive to do instead</small>
                         </div>
                     </form>
                 </div>

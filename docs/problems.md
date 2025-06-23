@@ -3,3 +3,4 @@
 - the popup, when showing a page that has been added as distracting has a redundant text at the bottom showing the limit settings for the page, but the progressbars and their texts are already enough above to convey this info
 - on the settings page when I want to edit a time limit or an open limit for a site, the save button next to it is invisible by default and only appears when I hover over the place where it should be
 -  on the settings page the website url validator does not show a a warning if the focus leaves the url field
+- I think the cache is not cleared when editing, deleting limits or disabling/enabling a limit in the settings -> opening the websites still lead to the timout page after changing disabling a rule
