@@ -1,0 +1,17 @@
+- it's nice to have a ".prompts" folder to version the prompts (hidden from Coding Agents)
+- it's nice to have a "docs" or "project_management" folder that contain plans, specs, ideas from that were yielded by plannign prompts
+- useful reusable prompts: 
+    - idea polishing
+    - specs
+    - planning
+    - coding
+    - debugging
+    - verifying (code quality, test quality, test coverage)
+    - testing
+    - fixing tests/code
+    - fixing code after QA
+- probably process things could be automated: running code prompt in phases each phase in a new context, running tests and fixing them after each phase, planning QA and collecting results for next phase to fix, orchestrating all of this
+- good to write scripts for packaging the apps
+- we should manage docs for ideas, plans, specs, QA results in a better way as now (either living files, or better naming conventions that belong to app versions)
+- sometimes specs, plans are changed and then we need to update the docs otherwise we have inconsistencies when the coding agents read those vs the code
+- it would be nice to have a tool that can feed some input to the tools as params/arguments but invoke them without the need of copy paste (automated coding process, workflow)
