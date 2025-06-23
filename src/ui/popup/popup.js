@@ -53,8 +53,6 @@ function initializeElements() {
 
       // Existing limits display - updated for new structure
       existingLimits: document.getElementById('existingLimits'),
-      timeLimitDisplay: document.getElementById('timeLimitDisplay'),
-      openLimitDisplay: document.getElementById('openLimitDisplay'),
 
       // Progress bars
       timeProgress: document.getElementById('timeProgress'),
@@ -399,21 +397,7 @@ function displayExistingLimits(siteInfo) {
     const usedMinutes = Math.round((siteInfo.todaySeconds || 0) / 60);
     const percentage = Math.min((usedMinutes / limitMinutes) * 100, 100);
 
-    // Update time limit display
-    if (elements.timeLimitDisplay) {
-      // Clear existing content
-      elements.timeLimitDisplay.textContent = '';
-      
-      const span = document.createElement('span');
-      span.textContent = 'Daily Time Limit:';
-      
-      const strong = document.createElement('strong');
-      strong.textContent = `${limitMinutes} minute${limitMinutes !== 1 ? 's' : ''}`;
-      
-      elements.timeLimitDisplay.appendChild(span);
-      elements.timeLimitDisplay.appendChild(strong);
-      elements.timeLimitDisplay.style.display = 'flex';
-    }
+
 
     // Show time progress with enhanced styling
     if (
@@ -437,9 +421,6 @@ function displayExistingLimits(siteInfo) {
       elements.timeProgress.style.display = 'block';
     }
   } else {
-    if (elements.timeLimitDisplay) {
-      elements.timeLimitDisplay.style.display = 'none';
-    }
     if (elements.timeProgress) {
       elements.timeProgress.style.display = 'none';
     }
@@ -453,21 +434,7 @@ function displayExistingLimits(siteInfo) {
       100
     );
 
-    // Update open limit display
-    if (elements.openLimitDisplay) {
-      // Clear existing content
-      elements.openLimitDisplay.textContent = '';
-      
-      const span = document.createElement('span');
-      span.textContent = 'Daily Open Limit:';
-      
-      const strong = document.createElement('strong');
-      strong.textContent = `${siteInfo.dailyOpenLimit} open${siteInfo.dailyOpenLimit !== 1 ? 's' : ''}`;
-      
-      elements.openLimitDisplay.appendChild(span);
-      elements.openLimitDisplay.appendChild(strong);
-      elements.openLimitDisplay.style.display = 'flex';
-    }
+
 
     // Show open progress with enhanced styling
     if (
@@ -491,9 +458,6 @@ function displayExistingLimits(siteInfo) {
       elements.openProgress.style.display = 'block';
     }
   } else {
-    if (elements.openLimitDisplay) {
-      elements.openLimitDisplay.style.display = 'none';
-    }
     if (elements.openProgress) {
       elements.openProgress.style.display = 'none';
     }

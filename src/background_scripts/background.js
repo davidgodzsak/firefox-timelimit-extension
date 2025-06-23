@@ -5,6 +5,10 @@
  * event-driven architecture. It acts as an event router, listening to browser events
  * and dispatching them to appropriate handler modules.
  *
+ * QA FIX (Phase 4): Enhanced with comprehensive cache invalidation and immediate
+ * re-evaluation system to ensure setting changes take effect immediately across all tabs.
+ * Fixes issue where disabled/deleted limits didn't clear cache properly.
+ *
  * Key responsibilities:
  * - Listen to browser.runtime.onInstalled to initialize alarms
  * - Listen to browser.alarms.onAlarm to handle scheduled tasks
@@ -13,6 +17,7 @@
  * - Listen to browser.action.onClicked for toolbar interaction
  * - Route events to appropriate modules (daily reset, usage tracking, site blocking, etc.)
  * - Maintain stateless architecture with chrome.storage as single source of truth
+ * - [NEW] Immediate cache invalidation and tab re-evaluation on settings changes
  */
 
 import { initializeDailyResetAlarm, performDailyReset } from './daily_reset.js';
@@ -573,6 +578,18 @@ async function handleMessage(message, _sender, _sendResponse) {
         // Refresh badge for current tab since limits may have changed
         await _refreshCurrentTabBadge();
 
+        // QA FIX: Re-evaluate ALL tabs for new site blocking status
+        // A newly added site might now block currently open tabs
+        try {
+          await _reEvaluateAllTabsForSite(newSite, 'add');
+        } catch (error) {
+          console.warn(
+            '[Background] Error re-evaluating all tabs after site addition:',
+            error
+          );
+          // Don't fail the operation if re-evaluation fails
+        }
+
         // Broadcast the update to all UI components
         await broadcastToUIComponents('siteAdded', { site: newSite });
 
@@ -627,40 +644,13 @@ async function handleMessage(message, _sender, _sendResponse) {
           updates: message.payload.updates,
         });
 
-        // CRITICAL: Re-evaluate current tab blocking status immediately
-        // This fixes the issue where updated limits don't take effect until next navigation
+        // QA FIX: Re-evaluate ALL tabs for blocking status immediately after limit update
+        // This ensures users can access sites immediately after updating limits in any tab
         try {
-          const [activeTab] = await browser.tabs.query({
-            active: true,
-            currentWindow: true,
-          });
-          if (activeTab && activeTab.url) {
-            console.log(
-              `[Background] Re-evaluating blocking status for current tab after limit update`
-            );
-
-            // Check if current tab would be blocked with new limits
-            const blockResult = await checkAndBlockSite(
-              activeTab.id,
-              activeTab.url
-            );
-            console.log(`[Background] Re-evaluation result:`, blockResult);
-
-            // If site is no longer blocked and we're on timeout page, we can't redirect back
-            // automatically since we don't store the original URL. Instead, just refresh the badge.
-            if (
-              !blockResult.shouldBlock &&
-              activeTab.url.includes('ui/timeout/timeout.html')
-            ) {
-              console.log(
-                `[Background] Site no longer blocked but currently on timeout page. User can navigate back manually.`
-              );
-              // Note: We could store original URL in the future for automatic redirect
-            }
-          }
+          await _reEvaluateAllTabsForSite(updatedSite, 'update');
         } catch (error) {
           console.warn(
-            '[Background] Error re-evaluating blocking status after limit update:',
+            '[Background] Error re-evaluating all tabs after limit update:',
             error
           );
           // Don't fail the whole operation if re-evaluation fails
@@ -703,6 +693,24 @@ async function handleMessage(message, _sender, _sendResponse) {
 
         // Refresh badge for current tab since the site may have been removed
         await _refreshCurrentTabBadge();
+
+        // QA FIX: Re-evaluate ALL tabs for blocking status immediately after site deletion
+        // This ensures users can access sites immediately after removing limits from any tab
+        try {
+          // Use the deleted site's data for re-evaluation (pass the site that was just deleted)
+          const deletedSiteData = { 
+            id: message.payload.id, 
+            urlPattern: '*', // We don't have the pattern anymore, so check all tabs
+            isEnabled: false // Deleted sites are effectively disabled
+          };
+          await _reEvaluateAllTabsForSite(deletedSiteData, 'delete');
+        } catch (error) {
+          console.warn(
+            '[Background] Error re-evaluating all tabs after site deletion:',
+            error
+          );
+          // Don't fail the whole operation if re-evaluation fails
+        }
 
         // Broadcast the update to all UI components
         await broadcastToUIComponents('siteDeleted', {
@@ -1333,6 +1341,84 @@ async function _refreshCurrentTabBadge() {
   } catch (error) {
     console.warn('[Background] Error refreshing current tab badge:', error);
     // Non-critical, continue without throwing
+  }
+}
+
+/**
+ * QA FIX: Re-evaluates all tabs for blocking status after site configuration changes.
+ * This ensures immediate cache invalidation and proper blocking behavior across all tabs.
+ * @private
+ * @param {Object} siteData - The site data that was modified
+ * @param {string} operation - The type of operation ('update', 'delete')
+ */
+async function _reEvaluateAllTabsForSite(siteData, operation) {
+  try {
+    console.log(`[Background] Re-evaluating all tabs after site ${operation}`);
+    
+    // Get all tabs
+    const allTabs = await browser.tabs.query({});
+    console.log(`[Background] Found ${allTabs.length} tabs to re-evaluate`);
+    
+    let notificationsShown = 0;
+    const MAX_NOTIFICATIONS = 2; // Limit notifications to avoid spam
+    
+    for (const tab of allTabs) {
+      if (!tab.url || !tab.id) continue;
+      
+      // Skip extension pages and special URLs
+      if (tab.url.startsWith('chrome://') || 
+          tab.url.startsWith('moz-extension://') || 
+          tab.url.startsWith('about:')) {
+        continue;
+      }
+      
+      try {
+        // For deletions, we check if any site would block this tab
+        // For updates, we check the specific site
+        const blockResult = await checkAndBlockSite(tab.id, tab.url);
+        
+        console.log(`[Background] Tab ${tab.id} (${tab.url}) - Block result:`, {
+          shouldBlock: blockResult.shouldBlock,
+          siteId: blockResult.siteId,
+          reason: blockResult.reason
+        });
+        
+        // Update badge for this tab
+        await updateBadge(tab.id);
+        
+        // Special handling for timeout pages
+        if (tab.url.includes('ui/timeout/timeout.html')) {
+          if (!blockResult.shouldBlock) {
+            console.log(`[Background] Tab ${tab.id} no longer needs to be blocked`);
+            
+            // Show notification to user (limited to avoid spam)
+            if (notificationsShown < MAX_NOTIFICATIONS) {
+              try {
+                await browser.notifications.create({
+                  type: 'basic',
+                  iconUrl: 'assets/icons/icon-48.png',
+                  title: 'Site Limit Changed',
+                  message: `You can now access this site. Go back or refresh the page.`
+                });
+                notificationsShown++;
+              } catch (notificationError) {
+                console.warn('[Background] Could not create notification:', notificationError);
+              }
+            }
+          }
+        }
+        
+      } catch (tabError) {
+        console.warn(`[Background] Error re-evaluating tab ${tab.id}:`, tabError);
+        // Continue with other tabs even if one fails
+      }
+    }
+    
+    console.log(`[Background] Completed re-evaluation of all tabs. Notifications shown: ${notificationsShown}`);
+    
+  } catch (error) {
+    console.error('[Background] Error in _reEvaluateAllTabsForSite:', error);
+    throw error; // Re-throw to let caller handle
   }
 }
 

@@ -641,6 +641,8 @@ class SettingsManager {
 
   /**
    * Validate site URL input
+   * QA FIX (Phase 3): Enhanced to always show validation errors on blur,
+   * providing immediate feedback when focus leaves the URL field regardless of "touched" state
    */
   validateSiteUrl() {
     const urlPattern = this.elements.siteUrlInput.value.trim();
@@ -654,7 +656,7 @@ class SettingsManager {
 
     // Basic validation
     if (!urlPattern) {
-      this.showFieldError(this.elements.siteUrlInput, 'URL is required');
+      this.showFieldError(this.elements.siteUrlInput, 'URL is required', true);
       return false;
     }
 
@@ -662,7 +664,8 @@ class SettingsManager {
     if (urlPattern.length > 2000) {
       this.showFieldError(
         this.elements.siteUrlInput,
-        'URL is too long (max 2000 characters)'
+        'URL is too long (max 2000 characters)',
+        true
       );
       return false;
     }
@@ -682,7 +685,8 @@ class SettingsManager {
     ) {
       this.showFieldError(
         this.elements.siteUrlInput,
-        'Invalid URL pattern contains restricted protocol'
+        'Invalid URL pattern contains restricted protocol',
+        true
       );
       return false;
     }
@@ -695,9 +699,11 @@ class SettingsManager {
 
     const hostnameRegex = /^[a-z0-9.-]+[a-z0-9]$/;
     if (!hostnameRegex.test(normalized.split('/')[0])) {
+      // QA FIX: Force show error for blur validation - always display warning when focus leaves field
       this.showFieldError(
         this.elements.siteUrlInput,
-        'Please enter a valid domain (e.g., example.com)'
+        'Please enter a valid domain (e.g., example.com)',
+        true // Force show regardless of touched state
       );
       return false;
     }
@@ -730,7 +736,8 @@ class SettingsManager {
     if (isNaN(timeLimit) || timeLimit <= 0) {
       this.showFieldError(
         this.elements.timeLimitInput,
-        'Time limit must be a positive number'
+        'Time limit must be a positive number',
+        true
       );
       return false;
     }
@@ -739,7 +746,8 @@ class SettingsManager {
       // 24 hours in minutes
       this.showFieldError(
         this.elements.timeLimitInput,
-        'Time limit cannot exceed 24 hours'
+        'Time limit cannot exceed 24 hours',
+        true
       );
       return false;
     }
@@ -772,7 +780,8 @@ class SettingsManager {
     if (isNaN(openLimit) || openLimit <= 0) {
       this.showFieldError(
         this.elements.openLimitInput,
-        'Open limit must be a positive number'
+        'Open limit must be a positive number',
+        true
       );
       return false;
     }
@@ -780,7 +789,8 @@ class SettingsManager {
     if (openLimit > 100) {
       this.showFieldError(
         this.elements.openLimitInput,
-        'Open limit cannot exceed 100'
+        'Open limit cannot exceed 100',
+        true
       );
       return false;
     }
@@ -803,14 +813,15 @@ class SettingsManager {
     }
 
     if (!noteText) {
-      this.showFieldError(this.elements.noteTextInput, 'Note text is required');
+      this.showFieldError(this.elements.noteTextInput, 'Note text is required', true);
       return false;
     }
 
     if (noteText.length > 1000) {
       this.showFieldError(
         this.elements.noteTextInput,
-        'Note text is too long (max 1000 characters)'
+        'Note text is too long (max 1000 characters)',
+        true
       );
       return false;
     }
@@ -821,8 +832,11 @@ class SettingsManager {
 
   /**
    * Show field-specific error message
+   * @param {HTMLElement} inputElement - The input element to show error for
+   * @param {string} message - The error message to display
+   * @param {boolean} forceShow - Whether to always show errors regardless of touched state (for blur validation)
    */
-  showFieldError(inputElement, message) {
+  showFieldError(inputElement, message, forceShow = false) {
     // Clear any existing error messages
     const existingError =
       inputElement.parentElement.querySelector('.error-message');
@@ -831,11 +845,12 @@ class SettingsManager {
     }
 
     if (message) {
-      // Only show error styling if the field has been touched or form submitted
-      if (
+      // QA FIX: Always show error styling for blur validation or if field has been touched/form submitted
+      const shouldShowError = forceShow ||
         inputElement.classList.contains('touched') ||
-        inputElement.closest('form').dataset.submitted
-      ) {
+        inputElement.closest('form').dataset.submitted;
+
+      if (shouldShowError) {
         inputElement.classList.add('error');
 
         const errorDiv = document.createElement('div');
@@ -850,11 +865,15 @@ class SettingsManager {
         inputElement.parentElement.appendChild(errorDiv);
       }
 
-      // Show toast for the error
-      this.showToast(message, 'warning');
+      // Show toast for the error only if forcing display (blur validation)
+      if (forceShow) {
+        this.showToast(message, 'warning');
+      }
 
-      // Focus the problematic field
-      inputElement.focus();
+      // Don't auto-focus on blur validation to avoid disrupting user workflow
+      if (!forceShow) {
+        inputElement.focus();
+      }
     } else {
       // Remove error styling
       inputElement.classList.remove('error');

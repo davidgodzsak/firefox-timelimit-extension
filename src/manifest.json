@@ -23,7 +23,7 @@
     "scripts": ["background_scripts/background.js"],
     "type": "module"
   },
-  "permissions": ["storage", "alarms", "tabs", "webNavigation", "activeTab"],
+  "permissions": ["storage", "alarms", "tabs", "webNavigation", "activeTab", "notifications"],
   "options_ui": {
     "page": "ui/settings/settings.html",
     "open_in_tab": true
