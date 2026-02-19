@@ -1,5 +1,7 @@
 # Firefox Distraction Limiter
 
+I have updated it with better UI and I am making improvements to it constantly now. I will come back later with more. The project now is on https://github.com/davidgodzsak/mindful-browse
+
 > A Firefox extension that helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
