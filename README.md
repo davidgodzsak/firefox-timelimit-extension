@@ -1,6 +1,9 @@
 # Firefox Distraction Limiter
 
-I have updated it with better UI and I am making improvements to it constantly now. I will come back later with more. The project now is on https://github.com/davidgodzsak/mindful-browse
+> [!IMPORTANT]
+> **This repository has moved to [github.com/davidgodzsak/time-limit](https://github.com/davidgodzsak/time-limit).**
+> It is archived and no longer updated. The extension (now called Time Limit, for Firefox and Chrome) lives there, so please star and follow that repo instead.
+> Install: [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/time-limit-extension/)
 
 > A Firefox extension that helps users limit time spent on distracting websites by monitoring usage and blocking sites when daily limits are reached.
 
